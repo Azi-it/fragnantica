@@ -3,3 +3,7 @@
 product/images/*
 !product/images/sample_*.jpg
 !product/images/CREDITS.txt
+
+# emails saved by MAIL_DRIVER 'log' (they contain password reset links)
+storage/mail/*
+!storage/mail/.gitkeep

@@ -33,8 +33,10 @@
                     <?php
                     // admin-only links
                     if (isset($_SESSION['role']) && $_SESSION['role'] === 'admin') {
+                        echo '<li class="nav-item"><a class="nav-link" href="/Fragnantica/admin/index.php"><i class="fa-solid fa-chart-line"></i> Dashboard</a></li>';
                         echo '<li class="nav-item"><a class="nav-link" href="/Fragnantica/product/index.php">Products</a></li>';
                         echo '<li class="nav-item"><a class="nav-link" href="/Fragnantica/product/create.php">Add Product</a></li>';
+                        echo '<li class="nav-item"><a class="nav-link" href="/Fragnantica/order/index.php"><i class="fa-solid fa-receipt"></i> Orders</a></li>';
                     }
 
                     // links for any logged in user
@@ -60,7 +62,7 @@
                         <a href='/Fragnantica/user/register.php' class='nav-item nav-link'>Register</a></div>";
                 } else {
                     echo "<div class='navbar-nav ms-auto'>
-                        <span class='nav-item nav-link'><i class='fa-solid fa-user'></i> {$_SESSION['name']}</span>
+                        <span class='nav-item nav-link'><i class='fa-solid fa-user'></i> " . htmlspecialchars($_SESSION['name'], ENT_QUOTES, 'UTF-8') . "</span>
                         <a href='/Fragnantica/user/logout.php' class='nav-item nav-link'>Logout</a></div>";
                 }
                 ?>

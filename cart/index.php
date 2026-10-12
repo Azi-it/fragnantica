@@ -1,6 +1,7 @@
 <?php
 session_start();
 include('../includes/config.php');
+include('../includes/functions.php');
 
 if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'customer') {
     $_SESSION['message'] = 'please log in with a customer account';
@@ -17,9 +18,18 @@ $sql = "SELECT c.product_id, c.quantity, p.name, p.brand, p.size, p.unit, p.sell
         INNER JOIN stock s USING (product_id)
         WHERE c.user_id = ?
         ORDER BY c.added_at DESC";
-$result = mysqli_execute_query($conn, $sql, [$user_id]);
-$itemCount = mysqli_num_rows($result);
+$items = mysqli_fetch_all(mysqli_execute_query($conn, $sql, [$user_id]), MYSQLI_ASSOC);
+
 $grandTotal = 0;
+$totalUnits = 0;
+$hasStockIssue = false;
+foreach ($items as $item) {
+    $grandTotal += $item['sell_price'] * $item['quantity'];
+    $totalUnits += (int)$item['quantity'];
+    if ($item['quantity'] > $item['stock']) {
+        $hasStockIssue = true;
+    }
+}
 
 include('../includes/header.php');
 ?>
@@ -27,51 +37,67 @@ include('../includes/header.php');
     <?php include('../includes/alert.php'); ?>
     <h2>My Cart</h2>
 
-    <?php if ($itemCount === 0) { ?>
+    <?php if (empty($items)) { ?>
         <p>Your cart is empty. <a href="../index.php">Browse products</a></p>
     <?php } else { ?>
-        <table class="table table-bordered align-middle">
-            <thead>
-                <tr>
-                    <th>Photo</th><th>Product</th><th>Price</th>
-                    <th>Qty</th><th>Subtotal</th><th></th>
-                </tr>
-            </thead>
-            <tbody>
-            <?php
-            while ($row = mysqli_fetch_assoc($result)) {
-                $lineTotal = $row['sell_price'] * $row['quantity'];
-                $grandTotal += $lineTotal;
-
-                $name = htmlspecialchars($row['name'], ENT_QUOTES);
-                $brand = htmlspecialchars($row['brand'], ENT_QUOTES);
-                $img = htmlspecialchars($row['img_path'], ENT_QUOTES);
-                $warning = $row['quantity'] > $row['stock']
-                    ? "<br><small class='text-danger'>only {$row['stock']} left in stock</small>" : '';
-
-                echo "<tr>
-                    <td><img src='../product/{$img}' width='70' height='70' class='product-photo' alt='{$name}'></td>
-                    <td><strong>{$name}</strong><br>{$brand} &middot; {$row['size']} {$row['unit']}</td>
-                    <td>&#8369; " . number_format($row['sell_price'], 2) . "</td>
-                    <td>{$row['quantity']}{$warning}</td>
-                    <td>&#8369; " . number_format($lineTotal, 2) . "</td>
-                    <td>
-                        <form action='remove.php' method='POST'>
-                            <input type='hidden' name='product_id' value='{$row['product_id']}'>
-                            <button type='submit' name='submit' class='btn btn-outline-danger btn-sm'>Remove</button>
-                        </form>
-                    </td>
-                </tr>";
-            }
-            ?>
-            </tbody>
-            <tfoot>
-                <tr>
-                    <th colspan="4" class="text-end">Total</th>
-                    <th colspan="2">&#8369; <?= number_format($grandTotal, 2) ?></th>
-                </tr>
-            </tfoot>
-        </table>
+        <p class="text-muted small"><?= $totalUnits ?> item<?= $totalUnits === 1 ? '' : 's' ?> in your cart. Change a quantity and press Update; set it to 0 to remove the item.</p>
+        <div class="table-responsive">
+            <table class="table table-bordered align-middle">
+                <thead>
+                    <tr>
+                        <th>Photo</th><th>Product</th><th>Price</th>
+                        <th style="min-width: 190px;">Qty</th><th>Subtotal</th><th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                <?php foreach ($items as $row):
+                    $id = (int)$row['product_id'];
+                    $stock = (int)$row['stock'];
+                    $lineTotal = $row['sell_price'] * $row['quantity'];
+                ?>
+                    <tr>
+                        <td><a href="../product/view.php?id=<?= $id ?>"><img src="../product/<?= e($row['img_path']) ?>" width="70" height="70" class="product-photo" alt="<?= e($row['name']) ?>"></a></td>
+                        <td>
+                            <a href="../product/view.php?id=<?= $id ?>" class="text-reset"><strong><?= e($row['name']) ?></strong></a><br>
+                            <?= e($row['brand']) ?> &middot; <?= (int)$row['size'] ?> <?= e($row['unit']) ?>
+                        </td>
+                        <td><?= peso($row['sell_price']) ?></td>
+                        <td>
+                            <form action="update.php" method="POST" class="d-flex gap-1">
+                                <?= csrf_field() ?>
+                                <input type="hidden" name="product_id" value="<?= $id ?>">
+                                <input type="number" name="quantity" value="<?= (int)$row['quantity'] ?>" min="0" max="<?= $stock ?>"
+                                    class="form-control form-control-sm" style="max-width: 80px;" aria-label="Quantity of <?= e($row['name']) ?>">
+                                <button type="submit" name="submit" class="btn btn-outline-primary btn-sm">Update</button>
+                            </form>
+                            <?php if ($row['quantity'] > $stock): ?>
+                                <small class="text-danger">only <?= $stock ?> left in stock</small>
+                            <?php else: ?>
+                                <small class="text-muted"><?= $stock ?> in stock</small>
+                            <?php endif; ?>
+                        </td>
+                        <td><?= peso($lineTotal) ?></td>
+                        <td>
+                            <form action="remove.php" method="POST">
+                                <?= csrf_field() ?>
+                                <input type="hidden" name="product_id" value="<?= $id ?>">
+                                <button type="submit" name="submit" class="btn btn-outline-danger btn-sm">Remove</button>
+                            </form>
+                        </td>
+                    </tr>
+                <?php endforeach; ?>
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <th colspan="4" class="text-end">Total</th>
+                        <th colspan="2"><?= peso($grandTotal) ?></th>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+        <?php if ($hasStockIssue): ?>
+            <div class="alert alert-warning">Some items exceed what is left in stock. Lower those quantities before checking out.</div>
+        <?php endif; ?>
         <div class="d-flex justify-content-between">
             <a href="../index.php" class="btn btn-secondary">Continue shopping</a>
             <a href="checkout.php" class="btn btn-primary">Proceed to Checkout</a>

@@ -1,6 +1,7 @@
 <?php
 session_start();
 include('../includes/config.php');
+include('../includes/functions.php');
 
 if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'customer') {
     $_SESSION['message'] = 'please log in with a customer account';
@@ -9,6 +10,12 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'customer') {
 }
 
 if (isset($_POST['submit'])) {
+    if (!csrf_valid()) {
+        $_SESSION['message'] = 'Your session expired. Please try again.';
+        header("Location: index.php");
+        exit();
+    }
+
     $product_id = filter_var($_POST['product_id'] ?? '', FILTER_VALIDATE_INT);
 
     if ($product_id) {

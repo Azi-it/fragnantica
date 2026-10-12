@@ -1,5 +1,8 @@
 -- Online Fragrance & Scent Products Store
--- Database: users, customer, category, product, stock, cart, orders, order_items
+-- Database: users, customer, category, product, stock, cart, orders, order_items, order_status_history, password_resets
+--
+-- Already have the database from an older version and want to keep its data?
+-- Run the files in migrations/ in order (001, then 002) instead of this file.
 --
 -- How to import: open phpMyAdmin > Import > choose this file > Go
 -- WARNING: importing this file again deletes all data in these tables.
@@ -13,6 +16,8 @@ SET NAMES utf8mb4;
 CREATE DATABASE IF NOT EXISTS fragrance_store;
 USE fragrance_store;
 
+DROP TABLE IF EXISTS password_resets;
+DROP TABLE IF EXISTS order_status_history;
 DROP TABLE IF EXISTS order_items;
 DROP TABLE IF EXISTS orders;
 DROP TABLE IF EXISTS cart;
@@ -86,26 +91,61 @@ CREATE TABLE cart (
 );
 
 -- customer orders
+-- status flow: pending -> processing -> shipped -> completed (or cancelled before shipping)
+-- payment_method is a code from payment_methods() in includes/functions.php, e.g. 'cod'
 CREATE TABLE orders (
     order_id INT PRIMARY KEY NOT NULL AUTO_INCREMENT,
     user_id INT NOT NULL,
     total_amount DECIMAL(10,2) NOT NULL,
-    status ENUM('pending', 'completed', 'cancelled') NOT NULL DEFAULT 'completed',
+    status ENUM('pending', 'processing', 'shipped', 'completed', 'cancelled') NOT NULL DEFAULT 'pending',
     shipping_address VARCHAR(255) NOT NULL,
+    payment_method VARCHAR(20) NOT NULL DEFAULT 'cod',
+    payment_status ENUM('unpaid', 'paid') NOT NULL DEFAULT 'unpaid',
+    paid_at DATETIME NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NULL,
     FOREIGN KEY (user_id) REFERENCES users (user_id)
 );
 
--- individual items in an order (snapshot of price at checkout)
+-- individual items in an order (snapshot of selling price and cost price at checkout)
 CREATE TABLE order_items (
     order_item_id INT PRIMARY KEY NOT NULL AUTO_INCREMENT,
     order_id INT NOT NULL,
     product_id INT NOT NULL,
     quantity INT NOT NULL,
     price DECIMAL(10,2) NOT NULL,
+    cost DECIMAL(10,2) NULL,
     FOREIGN KEY (order_id) REFERENCES orders (order_id) ON DELETE CASCADE,
     FOREIGN KEY (product_id) REFERENCES product (product_id)
 );
+
+-- every status change of an order: who changed it, when, and an optional note
+CREATE TABLE order_status_history (
+    history_id INT PRIMARY KEY NOT NULL AUTO_INCREMENT,
+    order_id INT NOT NULL,
+    status ENUM('pending', 'processing', 'shipped', 'completed', 'cancelled') NOT NULL,
+    note VARCHAR(255) NULL,
+    changed_by INT NULL,
+    changed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (order_id) REFERENCES orders (order_id) ON DELETE CASCADE,
+    FOREIGN KEY (changed_by) REFERENCES users (user_id)
+);
+
+-- one row per "forgot password" request; only a hash of the emailed token is stored
+CREATE TABLE password_resets (
+    reset_id INT PRIMARY KEY NOT NULL AUTO_INCREMENT,
+    user_id INT NOT NULL,
+    token_hash CHAR(64) NOT NULL UNIQUE,
+    expires_at DATETIME NOT NULL,
+    used_at DATETIME NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users (user_id) ON DELETE CASCADE
+);
+
+-- the storefront filters and sorts by these
+CREATE INDEX idx_product_brand ON product (brand);
+CREATE INDEX idx_product_scent ON product (scent_type);
+CREATE INDEX idx_product_price ON product (sell_price);
 
 -- default admin account (password is admin123, hashed with password_hash)
 INSERT INTO users (name, email, password, role, created_at)

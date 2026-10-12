@@ -74,3 +74,176 @@ ul.products li h3 {
     overflow: hidden;
     margin-top: 5px;
 }
+
+/* product name and photo link to the product page */
+ul.products li h3 a {
+    color: inherit;
+    text-decoration: none;
+}
+
+ul.products li h3 a:hover {
+    text-decoration: underline;
+}
+
+/* filters above the product list */
+.filter-bar {
+    max-width: 1000px;
+}
+
+/* product detail page */
+.product-detail-photo {
+    width: 100%;
+    max-height: 420px;
+    object-fit: contain;
+    background-color: #FFFFFF;
+    border: 1px solid #EAEAEA;
+    padding: 10px;
+}
+
+.product-detail .price {
+    color: #8B1E3F;
+    font-size: 1.6em;
+}
+
+.related-card img {
+    height: 140px;
+    object-fit: contain;
+}
+
+.related-card .price {
+    font-size: 1em;
+}
+
+.related-card:hover {
+    border-color: #8B1E3F;
+}
+
+/* order progress: Placed > Processing > Shipped > Completed */
+.order-progress {
+    display: flex;
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.order-progress li {
+    flex: 1;
+    position: relative;
+    text-align: center;
+    font-size: 0.85em;
+    color: #9A9A9A;
+    padding-top: 24px;
+}
+
+.order-progress li .dot {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background-color: #DDDDDD;
+    z-index: 1;
+}
+
+/* the line joining each step to the one before it */
+.order-progress li::before {
+    content: "";
+    position: absolute;
+    top: 7px;
+    left: -50%;
+    width: 100%;
+    height: 2px;
+    background-color: #DDDDDD;
+}
+
+.order-progress li:first-child::before {
+    display: none;
+}
+
+.order-progress li.done,
+.order-progress li.current {
+    color: #333333;
+}
+
+.order-progress li.done .dot,
+.order-progress li.current .dot,
+.order-progress li.done::before,
+.order-progress li.current::before {
+    background-color: #198754;
+}
+
+.order-progress li.current {
+    font-weight: bold;
+}
+
+/* order history list */
+.order-history li {
+    padding: 6px 0;
+    border-bottom: 1px solid #F0F0F0;
+}
+
+.order-history li:last-child {
+    border-bottom: 0;
+}
+
+.payment-option {
+    padding: 6px 0;
+}
+
+/* admin dashboard: key numbers */
+.dashboard .kpi-label {
+    font-size: 0.75em;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #888888;
+}
+
+.dashboard .kpi-value {
+    font-family: "Trebuchet MS", Arial, Helvetica, sans-serif;
+    font-size: 1.5em;
+    color: #3D3D3D;
+    font-variant-numeric: tabular-nums;
+}
+
+/* admin dashboard: sales bar chart */
+.sales-chart {
+    display: flex;
+    align-items: stretch;
+    gap: 6px;
+    height: 180px;
+}
+
+.sales-chart .bar-col {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.sales-chart .bar-track {
+    flex: 1;
+    display: flex;
+    align-items: flex-end;
+    background-color: #F7F7F7;
+    border-radius: 3px 3px 0 0;
+}
+
+.sales-chart .bar {
+    width: 100%;
+    background-color: #8B1E3F;
+    border-radius: 3px 3px 0 0;
+}
+
+.sales-chart .bar-col:hover .bar {
+    background-color: #B0365A;
+}
+
+.sales-chart .bar-label {
+    text-align: center;
+    font-size: 0.7em;
+    color: #888888;
+    padding-top: 4px;
+    font-variant-numeric: tabular-nums;
+}

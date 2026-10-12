@@ -16,14 +16,16 @@ if (isset($_POST['submit'])) {
         if (mysqli_num_rows($result) === 1) {
             $row = mysqli_fetch_assoc($result);
             if (password_verify($password, $row['password'])) {
+                // new session id on login, so a session id planted before login is useless
+                session_regenerate_id(true);
                 $_SESSION['user_id'] = $row['user_id'];
                 $_SESSION['name'] = $row['name'];
                 $_SESSION['email'] = $row['email'];
                 $_SESSION['role'] = $row['role'];
 
-                // admins go to the admin page, customers go to the store
+                // admins go to the dashboard, customers go to the store
                 if ($row['role'] === 'admin') {
-                    header("Location: ../product/index.php");
+                    header("Location: ../admin/index.php");
                 } else {
                     header("Location: ../index.php");
                 }
@@ -51,7 +53,10 @@ include("../includes/header.php");
 
         <!-- Password input -->
         <div class="mb-3">
-            <label class="form-label" for="password">Password</label>
+            <div class="d-flex justify-content-between">
+                <label class="form-label" for="password">Password</label>
+                <a href="forgot_password.php" class="small">Forgot password?</a>
+            </div>
             <input type="password" id="password" class="form-control" name="password" />
         </div>
 

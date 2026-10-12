@@ -1,6 +1,7 @@
 <?php
 session_start();
 include('../includes/config.php');
+include('../includes/functions.php');
 
 // 1. must be logged in
 if (!isset($_SESSION['user_id'])) {
@@ -27,9 +28,29 @@ $user_id = $_SESSION['user_id'];
 $product_id = filter_var($_POST['product_id'] ?? '', FILTER_VALIDATE_INT);
 $qty = filter_var($_POST['quantity'] ?? '', FILTER_VALIDATE_INT);
 
+// where to go afterwards: back to the product page, or back to the store with the same filters.
+// only our own pages and known filter names are allowed, so this cannot redirect anywhere else.
+$back = '../index.php';
+if (($_POST['return'] ?? '') === 'product' && $product_id) {
+    $back = '../product/view.php?id=' . (int)$product_id;
+} else if (isset($_POST['return_query']) && is_string($_POST['return_query'])) {
+    parse_str($_POST['return_query'], $query);
+    $allowed = array('search', 'category', 'brand', 'scent', 'min_price', 'max_price', 'in_stock', 'sort', 'page');
+    $query = array_filter(array_intersect_key($query, array_flip($allowed)), 'is_string');
+    if ($query) {
+        $back .= '?' . http_build_query($query);
+    }
+}
+
+if (!csrf_valid()) {
+    $_SESSION['message'] = 'Your session expired. Please try again.';
+    header("Location: {$back}");
+    exit();
+}
+
 if (!$product_id || $qty === false || $qty < 1) {
     $_SESSION['message'] = 'invalid product or quantity';
-    header("Location: ../index.php");
+    header("Location: {$back}");
     exit();
 }
 
@@ -58,7 +79,7 @@ try {
 
     if ($newQty > $stock) {
         $_SESSION['message'] = "only {$stock} in stock (you already have {$currentQty} in your cart)";
-        header("Location: ../index.php");
+        header("Location: {$back}");
         exit();
     }
 
@@ -67,11 +88,11 @@ try {
             ON DUPLICATE KEY UPDATE quantity = ?";
     mysqli_execute_query($conn, $sql, [$user_id, $product_id, $newQty, $newQty]);
 
-    $safeName = htmlspecialchars($product['name'], ENT_QUOTES);
-    $_SESSION['success'] = "added {$qty} x {$safeName} to your cart";
+    $safeName = e($product['name']);
+    $_SESSION['success'] = "added {$qty} x {$safeName} to your cart. <a href='/Fragnantica/cart/index.php' class='alert-link'>View cart</a>";
 } catch (mysqli_sql_exception $e) {
     $_SESSION['message'] = 'could not add to cart, please try again';
 }
 
-header("Location: ../index.php");
+header("Location: {$back}");
 exit();

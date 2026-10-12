@@ -1,6 +1,7 @@
 <?php
 session_start();
 include('../includes/config.php');
+include('../includes/functions.php');
 
 // 1. Must be logged in as customer
 if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'customer') {
@@ -10,9 +11,24 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'customer') {
 }
 
 $user_id = $_SESSION['user_id'];
+$methods = payment_methods();
 
 // Handle order placement (POST)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['place_order'])) {
+    if (!csrf_valid()) {
+        $_SESSION['message'] = 'Your session expired. Please review your order and try again.';
+        header("Location: checkout.php");
+        exit();
+    }
+
+    // the payment method must be one we actually offer
+    $payment_method = isset($_POST['payment_method']) ? (string)$_POST['payment_method'] : '';
+    if (!isset($methods[$payment_method])) {
+        $_SESSION['message'] = 'Please choose a payment method.';
+        header("Location: checkout.php");
+        exit();
+    }
+
     // Verify customer delivery details
     $sql = "SELECT addressline, town, zipcode, phone FROM customer WHERE user_id = ? LIMIT 1";
     $result = mysqli_execute_query($conn, $sql, [$user_id]);
@@ -31,7 +47,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['place_order'])) {
 
     try {
         // 1. Fetch current cart items
-        $sql = "SELECT c.product_id, c.quantity, p.name, p.sell_price
+        $sql = "SELECT c.product_id, c.quantity, p.name, p.sell_price, p.cost_price
                 FROM cart c
                 INNER JOIN product p USING (product_id)
                 WHERE c.user_id = ?";
@@ -60,7 +76,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['place_order'])) {
 
             if ($currentStock < $requestedQty) {
                 mysqli_rollback($conn);
-                $safeName = htmlspecialchars($item['name'], ENT_QUOTES);
+                $safeName = e($item['name']);
                 $_SESSION['message'] = "Not enough stock for {$safeName}. Only {$currentStock} remaining.";
                 header("Location: index.php");
                 exit();
@@ -69,14 +85,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['place_order'])) {
             $grandTotal += $item['sell_price'] * $requestedQty;
         }
 
-        // 3. Create the order
-        $orderSql = "INSERT INTO orders (user_id, total_amount, status, shipping_address, created_at)
-                     VALUES (?, ?, 'completed', ?, NOW())";
-        mysqli_execute_query($conn, $orderSql, [$user_id, $grandTotal, $shipping_address]);
+        // 3. Create the order. It starts as pending and unpaid; the admin moves it along from there.
+        $orderSql = "INSERT INTO orders (user_id, total_amount, status, shipping_address, payment_method, payment_status, created_at)
+                     VALUES (?, ?, 'pending', ?, ?, 'unpaid', NOW())";
+        mysqli_execute_query($conn, $orderSql, [$user_id, $grandTotal, $shipping_address, $payment_method]);
         $order_id = mysqli_insert_id($conn);
 
         // 4. Insert order_items and deduct stock
-        $itemInsertSql = "INSERT INTO order_items (order_id, product_id, quantity, price) VALUES (?, ?, ?, ?)";
+        $itemInsertSql = "INSERT INTO order_items (order_id, product_id, quantity, price, cost) VALUES (?, ?, ?, ?, ?)";
         $itemInsertStmt = mysqli_prepare($conn, $itemInsertSql);
 
         $deductStockSql = "UPDATE stock SET quantity = quantity - ? WHERE product_id = ?";
@@ -86,31 +102,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['place_order'])) {
             $product_id = (int)$item['product_id'];
             $quantity = (int)$item['quantity'];
             $price = (float)$item['sell_price'];
+            $cost = (float)$item['cost_price'];
 
-            mysqli_stmt_bind_param($itemInsertStmt, 'iiid', $order_id, $product_id, $quantity, $price);
+            mysqli_stmt_bind_param($itemInsertStmt, 'iiidd', $order_id, $product_id, $quantity, $price, $cost);
             mysqli_stmt_execute($itemInsertStmt);
 
             mysqli_stmt_bind_param($deductStockStmt, 'ii', $quantity, $product_id);
             mysqli_stmt_execute($deductStockStmt);
         }
 
-        // 5. Empty the customer's cart
+        // 5. First line of the order's history
+        record_status($conn, $order_id, 'pending', 'Order placed (' . payment_label($payment_method) . ')', $user_id);
+
+        // 6. Empty the customer's cart
         $clearCartSql = "DELETE FROM cart WHERE user_id = ?";
         mysqli_execute_query($conn, $clearCartSql, [$user_id]);
 
-        // 6. COMMIT the transaction
+        // 7. COMMIT the transaction
         mysqli_commit($conn);
-
-        $_SESSION['success'] = "Order #{$order_id} placed successfully!";
-        header("Location: order_confirmation.php?id={$order_id}");
-        exit();
-
     } catch (mysqli_sql_exception $e) {
         mysqli_rollback($conn);
         $_SESSION['message'] = 'Checkout failed due to a database error. Please try again.';
         header("Location: index.php");
         exit();
     }
+
+    // 8. the order is saved; now email the customer (a failed email does not undo the order)
+    notify_order_placed($conn, $order_id);
+
+    $_SESSION['success'] = "Order #{$order_id} placed successfully! A confirmation has been sent to your email.";
+    header("Location: order_confirmation.php?id={$order_id}");
+    exit();
 }
 
 // GET: Display checkout review page
@@ -174,33 +196,30 @@ include('../includes/header.php');
                         <tbody>
                         <?php foreach ($cartItems as $item):
                             $lineTotal = $item['sell_price'] * $item['quantity'];
-                            $name = htmlspecialchars($item['name'], ENT_QUOTES);
-                            $brand = htmlspecialchars($item['brand'], ENT_QUOTES);
-                            $img = htmlspecialchars($item['img_path'], ENT_QUOTES);
                             $stockWarning = $item['quantity'] > $item['stock']
-                                ? "<br><small class='text-danger'>Only {$item['stock']} available in stock</small>" : '';
+                                ? "<br><small class='text-danger'>Only " . (int)$item['stock'] . " available in stock</small>" : '';
                         ?>
                             <tr>
                                 <td>
                                     <div class="d-flex align-items-center">
-                                        <img src="../product/<?= $img ?>" width="50" height="50" class="me-2 rounded" alt="<?= $name ?>">
+                                        <img src="../product/<?= e($item['img_path']) ?>" width="50" height="50" class="me-2 rounded product-photo" alt="<?= e($item['name']) ?>">
                                         <div>
-                                            <strong><?= $name ?></strong><br>
-                                            <small class="text-muted"><?= $brand ?> &middot; <?= $item['size'] ?> <?= $item['unit'] ?></small>
+                                            <strong><?= e($item['name']) ?></strong><br>
+                                            <small class="text-muted"><?= e($item['brand']) ?> &middot; <?= (int)$item['size'] ?> <?= e($item['unit']) ?></small>
                                             <?= $stockWarning ?>
                                         </div>
                                     </div>
                                 </td>
-                                <td>&#8369; <?= number_format($item['sell_price'], 2) ?></td>
-                                <td><?= $item['quantity'] ?></td>
-                                <td>&#8369; <?= number_format($lineTotal, 2) ?></td>
+                                <td><?= peso($item['sell_price']) ?></td>
+                                <td><?= (int)$item['quantity'] ?></td>
+                                <td><?= peso($lineTotal) ?></td>
                             </tr>
                         <?php endforeach; ?>
                         </tbody>
                         <tfoot class="table-light">
                             <tr>
                                 <th colspan="3" class="text-end">Total:</th>
-                                <th>&#8369; <?= number_format($grandTotal, 2) ?></th>
+                                <th><?= peso($grandTotal) ?></th>
                             </tr>
                         </tfoot>
                     </table>
@@ -217,24 +236,11 @@ include('../includes/header.php');
                 </div>
                 <div class="card-body">
                     <?php if ($hasDeliveryDetails): ?>
-                        <p class="mb-1"><strong>Recipient:</strong> <?= htmlspecialchars($customer['name'], ENT_QUOTES) ?></p>
-                        <p class="mb-1"><strong>Email:</strong> <?= htmlspecialchars($customer['email'], ENT_QUOTES) ?></p>
-                        <p class="mb-1"><strong>Phone:</strong> <?= htmlspecialchars($customer['phone'], ENT_QUOTES) ?></p>
-                        <p class="mb-1"><strong>Address:</strong> <?= htmlspecialchars($customer['addressline'], ENT_QUOTES) ?></p>
-                        <p class="mb-3"><strong>Town / Zipcode:</strong> <?= htmlspecialchars($customer['town'], ENT_QUOTES) ?>, <?= htmlspecialchars($customer['zipcode'], ENT_QUOTES) ?></p>
-
-                        <?php if ($hasStockIssue): ?>
-                            <div class="alert alert-warning mb-3">
-                                Some items exceed available stock. Please adjust quantities in your cart before placing order.
-                            </div>
-                            <button class="btn btn-success w-100 btn-lg" disabled>Place Order</button>
-                        <?php else: ?>
-                            <form action="checkout.php" method="POST">
-                                <button type="submit" name="place_order" class="btn btn-success w-100 btn-lg">
-                                    <i class="fa-solid fa-check"></i> Place Order (&#8369; <?= number_format($grandTotal, 2) ?>)
-                                </button>
-                            </form>
-                        <?php endif; ?>
+                        <p class="mb-1"><strong>Recipient:</strong> <?= e($customer['name']) ?></p>
+                        <p class="mb-1"><strong>Email:</strong> <?= e($customer['email']) ?></p>
+                        <p class="mb-1"><strong>Phone:</strong> <?= e($customer['phone']) ?></p>
+                        <p class="mb-1"><strong>Address:</strong> <?= e($customer['addressline']) ?></p>
+                        <p class="mb-0"><strong>Town / Zipcode:</strong> <?= e($customer['town']) ?>, <?= e($customer['zipcode']) ?></p>
                     <?php else: ?>
                         <div class="alert alert-warning">
                             <strong>Missing Delivery Address!</strong><br>
@@ -246,6 +252,40 @@ include('../includes/header.php');
                     <?php endif; ?>
                 </div>
             </div>
+
+            <?php if ($hasDeliveryDetails): ?>
+                <form action="checkout.php" method="POST">
+                    <?= csrf_field() ?>
+                    <div class="card mb-4">
+                        <div class="card-header"><strong>Payment Method</strong></div>
+                        <div class="card-body">
+                            <?php $first = true; foreach ($methods as $code => $method): ?>
+                                <div class="form-check payment-option">
+                                    <input class="form-check-input" type="radio" name="payment_method"
+                                        id="pay_<?= e($code) ?>" value="<?= e($code) ?>" <?= $first ? 'checked' : '' ?>>
+                                    <label class="form-check-label" for="pay_<?= e($code) ?>">
+                                        <i class="<?= e($method['icon']) ?> me-1"></i> <strong><?= e($method['label']) ?></strong>
+                                        <br><small class="text-muted"><?= e($method['description']) ?></small>
+                                    </label>
+                                </div>
+                            <?php $first = false; endforeach; ?>
+                            <p class="small text-muted mb-0 mt-2">Online payment (GCash, cards) is coming soon.</p>
+                        </div>
+                    </div>
+
+                    <?php if ($hasStockIssue): ?>
+                        <div class="alert alert-warning mb-3">
+                            Some items exceed available stock. Please adjust quantities in your cart before placing order.
+                        </div>
+                        <button type="button" class="btn btn-success w-100 btn-lg" disabled>Place Order</button>
+                    <?php else: ?>
+                        <button type="submit" name="place_order" class="btn btn-success w-100 btn-lg">
+                            <i class="fa-solid fa-check"></i> Place Order (<?= peso($grandTotal) ?>)
+                        </button>
+                        <p class="small text-muted text-center mt-2 mb-0">You can cancel while the order is still pending.</p>
+                    <?php endif; ?>
+                </form>
+            <?php endif; ?>
         </div>
     </div>
 </div>

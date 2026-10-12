@@ -1,6 +1,7 @@
 <?php
 session_start();
 include("../includes/config.php");
+include("../includes/functions.php");
 
 // only logged in users can open their profile
 if (!isset($_SESSION['user_id'])) {
@@ -11,15 +12,53 @@ if (!isset($_SESSION['user_id'])) {
 
 $user_id = $_SESSION['user_id'];
 
+// ---------- change password ----------
+if (isset($_POST['change_password'])) {
+    $current = isset($_POST['current_password']) && is_string($_POST['current_password']) ? trim($_POST['current_password']) : '';
+    $new = isset($_POST['new_password']) && is_string($_POST['new_password']) ? trim($_POST['new_password']) : '';
+    $confirm = isset($_POST['confirm_password']) && is_string($_POST['confirm_password']) ? trim($_POST['confirm_password']) : '';
+
+    $sql = "SELECT name, email, password FROM users WHERE user_id = ? LIMIT 1";
+    $account = mysqli_fetch_assoc(mysqli_execute_query($conn, $sql, [$user_id]));
+
+    if (!csrf_valid()) {
+        $_SESSION['message'] = 'Your session expired. Please try again.';
+    } else if (!$account || !password_verify($current, $account['password'])) {
+        $_SESSION['message'] = 'your current password is not correct';
+    } else if (strlen($new) < 6) {
+        $_SESSION['message'] = 'the new password should be at least 6 characters';
+    } else if ($new !== $confirm) {
+        $_SESSION['message'] = 'the new passwords do not match';
+    } else if ($new === $current) {
+        $_SESSION['message'] = 'the new password must be different from the current one';
+    } else {
+        try {
+            mysqli_execute_query($conn, "UPDATE users SET password = ? WHERE user_id = ?", [password_hash($new, PASSWORD_BCRYPT), $user_id]);
+            // any reset links that were still waiting can no longer be used
+            mysqli_execute_query($conn, "UPDATE password_resets SET used_at = NOW() WHERE user_id = ? AND used_at IS NULL", [$user_id]);
+            session_regenerate_id(true);
+            notify_password_changed($account['email'], $account['name']);
+            $_SESSION['success'] = 'password changed';
+        } catch (mysqli_sql_exception $e) {
+            $_SESSION['message'] = 'could not change your password, please try again';
+        }
+    }
+    header("Location: profile.php");
+    exit();
+}
+
+// ---------- delivery details ----------
 if (isset($_POST['submit'])) {
-    $name = trim(strip_tags($_POST['name']));
-    $address = trim(strip_tags($_POST['address']));
-    $town = trim(strip_tags($_POST['town']));
-    $zipcode = trim($_POST['zipcode']);
-    $phone = trim($_POST['phone']);
+    $name = trim(strip_tags($_POST['name'] ?? ''));
+    $address = trim(strip_tags($_POST['address'] ?? ''));
+    $town = trim(strip_tags($_POST['town'] ?? ''));
+    $zipcode = trim($_POST['zipcode'] ?? '');
+    $phone = trim($_POST['phone'] ?? '');
 
     //validation
-    if ($name === '' || $address === '' || $town === '' || $zipcode === '' || $phone === '') {
+    if (!csrf_valid()) {
+        $_SESSION['message'] = 'Your session expired. Please try again.';
+    } else if ($name === '' || $address === '' || $town === '' || $zipcode === '' || $phone === '') {
         $_SESSION['message'] = 'please fill in all fields';
     } else if (!preg_match("/^[0-9]{4}$/", $zipcode)) {
         $_SESSION['message'] = 'zip code should be 4 digits';
@@ -49,7 +88,7 @@ if (isset($_POST['submit'])) {
             header("Location: profile.php");
             exit();
         } catch (mysqli_sql_exception $e) {
-            $_SESSION['message'] = 'could not save profile: ' . $e->getMessage();
+            $_SESSION['message'] = 'could not save profile, please try again';
         }
     }
 }
@@ -79,16 +118,17 @@ include("../includes/header.php");
                 <div class="card-header">My Profile</div>
                 <div class="card-body">
                     <p class="small text-muted">These details will be used as the delivery information for your orders.</p>
-                    <form action="<?php echo $_SERVER['PHP_SELF']; ?>" method="POST">
+                    <form action="profile.php" method="POST">
+                        <?= csrf_field() ?>
                         <div class="row gx-3 mb-3">
                             <div class="col-md-6">
                                 <label class="small mb-1" for="name">Name</label>
                                 <input class="form-control" id="name" type="text" placeholder="Enter your name"
-                                    name="name" value="<?php echo $profile['name']; ?>">
+                                    name="name" value="<?= e($profile['name']) ?>">
                             </div>
                             <div class="col-md-6">
                                 <label class="small mb-1" for="email">Email</label>
-                                <input class="form-control" id="email" type="text" value="<?php echo $profile['email']; ?>" disabled>
+                                <input class="form-control" id="email" type="text" value="<?= e($profile['email']) ?>" disabled>
                             </div>
                         </div>
 
@@ -96,12 +136,12 @@ include("../includes/header.php");
                             <div class="col-md-6">
                                 <label class="small mb-1" for="address">Address</label>
                                 <input class="form-control" id="address" type="text" placeholder="House no., street, barangay"
-                                    name="address" value="<?php echo $profile['addressline']; ?>">
+                                    name="address" value="<?= e($profile['addressline']) ?>">
                             </div>
                             <div class="col-md-6">
                                 <label class="small mb-1" for="town">Town / City</label>
                                 <input class="form-control" id="town" type="text" placeholder="Enter your town or city"
-                                    name="town" value="<?php echo $profile['town']; ?>">
+                                    name="town" value="<?= e($profile['town']) ?>">
                             </div>
                         </div>
 
@@ -109,16 +149,41 @@ include("../includes/header.php");
                             <div class="col-md-6">
                                 <label class="small mb-1" for="zip">Zip Code</label>
                                 <input class="form-control" id="zip" type="text" placeholder="e.g. 1630"
-                                    name="zipcode" value="<?php echo $profile['zipcode']; ?>">
+                                    name="zipcode" value="<?= e($profile['zipcode']) ?>">
                             </div>
                             <div class="col-md-6">
                                 <label class="small mb-1" for="phone">Phone Number</label>
                                 <input class="form-control" id="phone" type="tel" placeholder="e.g. 09171234567"
-                                    name="phone" value="<?php echo $profile['phone']; ?>">
+                                    name="phone" value="<?= e($profile['phone']) ?>">
                             </div>
                         </div>
 
                         <button class="btn btn-primary" type="submit" name="submit">Save changes</button>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header">Change Password</div>
+                <div class="card-body">
+                    <form action="profile.php" method="POST" autocomplete="off">
+                        <?= csrf_field() ?>
+                        <div class="row gx-3 mb-3">
+                            <div class="col-md-4">
+                                <label class="small mb-1" for="current_password">Current password</label>
+                                <input class="form-control" id="current_password" type="password" name="current_password" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="small mb-1" for="new_password">New password</label>
+                                <input class="form-control" id="new_password" type="password" name="new_password" minlength="6" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="small mb-1" for="confirm_password">Confirm new password</label>
+                                <input class="form-control" id="confirm_password" type="password" name="confirm_password" minlength="6" required>
+                            </div>
+                        </div>
+                        <button class="btn btn-outline-primary" type="submit" name="change_password">Change password</button>
+                        <span class="small text-muted ms-2">You will get an email confirming the change.</span>
                     </form>
                 </div>
             </div>
