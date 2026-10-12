@@ -2,7 +2,7 @@
 session_start();
 include('../includes/config.php');
 
-// only admins can edit perfumes
+// only admins can edit products
 if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'admin') {
     $_SESSION['message'] = 'admin access only, please log in with an admin account';
     header("Location: ../user/login.php");
@@ -10,19 +10,28 @@ if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'admin') {
 }
 
 if (isset($_POST['submit'])) {
-    $perfume_id = (int)$_POST['perfume_id'];
+    $product_id = (int)$_POST['product_id'];
     $name = trim(strip_tags($_POST['name']));
+    $categoryInput = trim($_POST['category_id']);
     $brand = trim(strip_tags($_POST['brand']));
     $scent = trim($_POST['scent_type']);
-    $sizeInput = trim($_POST['size_ml']);
+    $sizeInput = trim($_POST['size']);
+    $unit = trim($_POST['unit']);
+    $description = trim(strip_tags($_POST['description']));
     $costInput = trim($_POST['cost_price']);
     $sellInput = trim($_POST['sell_price']);
     $qtyInput = trim($_POST['quantity']);
     $hasErrors = false;
 
+    $units = array('ml', 'g', 'pcs');
+
     //validation
     if ($name === '') {
-        $_SESSION['nameError'] = 'Please input the perfume name';
+        $_SESSION['nameError'] = 'Please input the product name';
+        $hasErrors = true;
+    }
+    if ($categoryInput === '' || filter_var($categoryInput, FILTER_VALIDATE_INT) === false) {
+        $_SESSION['categoryError'] = 'Please choose a category';
         $hasErrors = true;
     }
     if ($brand === '') {
@@ -34,7 +43,14 @@ if (isset($_POST['submit'])) {
         $hasErrors = true;
     }
     if ($sizeInput === '' || filter_var($sizeInput, FILTER_VALIDATE_INT) === false || (int)$sizeInput <= 0) {
-        $_SESSION['sizeError'] = 'Please enter a valid size in ml';
+        $_SESSION['sizeError'] = 'Please enter a valid size';
+        $hasErrors = true;
+    } else if (!in_array($unit, $units)) {
+        $_SESSION['sizeError'] = 'Please choose a unit';
+        $hasErrors = true;
+    }
+    if (strlen($description) > 255) {
+        $_SESSION['descError'] = 'Description should be 255 characters or less';
         $hasErrors = true;
     }
     if ($costInput === '' || !is_numeric($costInput) || $costInput <= 0) {
@@ -66,24 +82,27 @@ if (isset($_POST['submit'])) {
 
     if ($hasErrors) {
         // keep what the admin typed so the form can be filled again
-        $_SESSION['perfumeName'] = $name;
+        $_SESSION['productName'] = $name;
+        $_SESSION['categoryId'] = $categoryInput;
         $_SESSION['brand'] = $brand;
         $_SESSION['scent'] = $scent;
         $_SESSION['size'] = $sizeInput;
+        $_SESSION['unit'] = $unit;
+        $_SESSION['description'] = $description;
         $_SESSION['cost'] = $costInput;
         $_SESSION['sell'] = $sellInput;
         $_SESSION['qty'] = $qtyInput;
-        header("Location: edit.php?id={$perfume_id}");
+        header("Location: edit.php?id={$product_id}");
         exit();
     }
 
     // get the current photo so it can be kept or replaced
-    $sql = "SELECT img_path FROM perfume WHERE perfume_id = ? LIMIT 1";
-    $result = mysqli_execute_query($conn, $sql, [$perfume_id]);
+    $sql = "SELECT img_path FROM product WHERE product_id = ? LIMIT 1";
+    $result = mysqli_execute_query($conn, $sql, [$product_id]);
     $row = mysqli_fetch_assoc($result);
 
     if (!$row) {
-        $_SESSION['message'] = 'perfume not found';
+        $_SESSION['message'] = 'product not found';
         header("Location: index.php");
         exit();
     }
@@ -102,30 +121,31 @@ if (isset($_POST['submit'])) {
         move_uploaded_file($source, $target) or die("Couldn't copy");
     }
 
+    $category_id = (int)$categoryInput;
     $size = (int)$sizeInput;
     $cost = (float)$costInput;
     $sell = (float)$sellInput;
     $qty = (int)$qtyInput;
 
-    // update the perfume and its stock together
+    // update the product and its stock together
     mysqli_begin_transaction($conn);
 
     try {
-        $sql = "UPDATE perfume SET name=?, brand=?, scent_type=?, size_ml=?, cost_price=?, sell_price=?, img_path=? WHERE perfume_id=?";
+        $sql = "UPDATE product SET category_id=?, name=?, brand=?, scent_type=?, size=?, unit=?, description=?, cost_price=?, sell_price=?, img_path=? WHERE product_id=?";
         $stmt1 = mysqli_prepare($conn, $sql);
-        mysqli_stmt_bind_param($stmt1, 'sssiddsi', $name, $brand, $scent, $size, $cost, $sell, $target, $perfume_id);
+        mysqli_stmt_bind_param($stmt1, 'isssissddsi', $category_id, $name, $brand, $scent, $size, $unit, $description, $cost, $sell, $target, $product_id);
         mysqli_stmt_execute($stmt1);
 
-        $sql = "UPDATE stock SET quantity=? WHERE perfume_id=?";
+        $sql = "UPDATE stock SET quantity=? WHERE product_id=?";
         $stmt2 = mysqli_prepare($conn, $sql);
-        mysqli_stmt_bind_param($stmt2, 'ii', $qty, $perfume_id);
+        mysqli_stmt_bind_param($stmt2, 'ii', $qty, $product_id);
         mysqli_stmt_execute($stmt2);
 
         mysqli_commit($conn);
     } catch (mysqli_sql_exception $e) {
         mysqli_rollback($conn);
-        $_SESSION['message'] = 'Could not update the perfume: ' . $e->getMessage();
-        header("Location: edit.php?id={$perfume_id}");
+        $_SESSION['message'] = 'Could not update the product: ' . $e->getMessage();
+        header("Location: edit.php?id={$product_id}");
         exit();
     }
 
@@ -134,7 +154,7 @@ if (isset($_POST['submit'])) {
         unlink($oldPhoto);
     }
 
-    $_SESSION['success'] = 'Perfume updated successfully';
+    $_SESSION['success'] = 'Product updated successfully';
     header("Location: index.php");
     exit();
 }

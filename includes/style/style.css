@@ -41,7 +41,7 @@ ul.products li h3 {
     text-align: center;
 }
 
-.product-thumb img, .perfume-photo {
+.product-thumb img, .product-photo {
     object-fit: contain;
 }
 
@@ -56,4 +56,21 @@ ul.products li h3 {
 .product-info .price {
     color: #8B1E3F;
     font-size: 1.1em;
+}
+
+.product-info .category {
+    font-size: 0.75em;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #888888;
+}
+
+/* short product description, cut off after 2 lines */
+.product-desc {
+    font-style: italic;
+    font-size: 0.8em;
+    margin-bottom: 4px;
+    height: 40px;
+    overflow: hidden;
+    margin-top: 5px;
 }

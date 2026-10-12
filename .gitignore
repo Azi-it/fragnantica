@@ -1,5 +1,5 @@
-# photos uploaded through the Add/Edit Perfume form
+# photos uploaded through the Add/Edit Product form
 # (only the sample photos and their credits are kept in the repo)
-perfume/images/*
-!perfume/images/sample_*.jpg
-!perfume/images/CREDITS.txt
+product/images/*
+!product/images/sample_*.jpg
+!product/images/CREDITS.txt

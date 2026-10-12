@@ -2,7 +2,7 @@
 session_start();
 include('../includes/config.php');
 
-// only admins can add perfumes
+// only admins can add products
 if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'admin') {
     $_SESSION['message'] = 'admin access only, please log in with an admin account';
     header("Location: ../user/login.php");
@@ -11,17 +11,26 @@ if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'admin') {
 
 if (isset($_POST['submit'])) {
     $name = trim(strip_tags($_POST['name']));
+    $categoryInput = trim($_POST['category_id']);
     $brand = trim(strip_tags($_POST['brand']));
     $scent = trim($_POST['scent_type']);
-    $sizeInput = trim($_POST['size_ml']);
+    $sizeInput = trim($_POST['size']);
+    $unit = trim($_POST['unit']);
+    $description = trim(strip_tags($_POST['description']));
     $costInput = trim($_POST['cost_price']);
     $sellInput = trim($_POST['sell_price']);
     $qtyInput = trim($_POST['quantity']);
     $hasErrors = false;
 
+    $units = array('ml', 'g', 'pcs');
+
     //validation
     if ($name === '') {
-        $_SESSION['nameError'] = 'Please input the perfume name';
+        $_SESSION['nameError'] = 'Please input the product name';
+        $hasErrors = true;
+    }
+    if ($categoryInput === '' || filter_var($categoryInput, FILTER_VALIDATE_INT) === false) {
+        $_SESSION['categoryError'] = 'Please choose a category';
         $hasErrors = true;
     }
     if ($brand === '') {
@@ -33,7 +42,14 @@ if (isset($_POST['submit'])) {
         $hasErrors = true;
     }
     if ($sizeInput === '' || filter_var($sizeInput, FILTER_VALIDATE_INT) === false || (int)$sizeInput <= 0) {
-        $_SESSION['sizeError'] = 'Please enter a valid size in ml';
+        $_SESSION['sizeError'] = 'Please enter a valid size';
+        $hasErrors = true;
+    } else if (!in_array($unit, $units)) {
+        $_SESSION['sizeError'] = 'Please choose a unit';
+        $hasErrors = true;
+    }
+    if (strlen($description) > 255) {
+        $_SESSION['descError'] = 'Description should be 255 characters or less';
         $hasErrors = true;
     }
     if ($costInput === '' || !is_numeric($costInput) || $costInput <= 0) {
@@ -63,10 +79,13 @@ if (isset($_POST['submit'])) {
 
     if ($hasErrors) {
         // keep what the admin typed so the form can be filled again
-        $_SESSION['perfumeName'] = $name;
+        $_SESSION['productName'] = $name;
+        $_SESSION['categoryId'] = $categoryInput;
         $_SESSION['brand'] = $brand;
         $_SESSION['scent'] = $scent;
         $_SESSION['size'] = $sizeInput;
+        $_SESSION['unit'] = $unit;
+        $_SESSION['description'] = $description;
         $_SESSION['cost'] = $costInput;
         $_SESSION['sell'] = $sellInput;
         $_SESSION['qty'] = $qtyInput;
@@ -74,6 +93,7 @@ if (isset($_POST['submit'])) {
         exit();
     }
 
+    $category_id = (int)$categoryInput;
     $size = (int)$sizeInput;
     $cost = (float)$costInput;
     $sell = (float)$sellInput;
@@ -89,33 +109,30 @@ if (isset($_POST['submit'])) {
     $target = 'images/' . time() . $ext;
     move_uploaded_file($source, $target) or die("Couldn't copy");
 
-    // save the perfume and its stock together
+    // save the product and its stock together
     mysqli_begin_transaction($conn);
 
     try {
-        $sql = "INSERT INTO perfume (name, brand, scent_type, size_ml, cost_price, sell_price, img_path) VALUES (?, ?, ?, ?, ?, ?, ?)";
+        $sql = "INSERT INTO product (category_id, name, brand, scent_type, size, unit, description, cost_price, sell_price, img_path) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
         $stmt1 = mysqli_prepare($conn, $sql);
-        mysqli_stmt_bind_param($stmt1, 'sssidds', $name, $brand, $scent, $size, $cost, $sell, $target);
+        mysqli_stmt_bind_param($stmt1, 'isssissdds', $category_id, $name, $brand, $scent, $size, $unit, $description, $cost, $sell, $target);
         mysqli_stmt_execute($stmt1);
-        $perfume_id = mysqli_insert_id($conn);
+        $product_id = mysqli_insert_id($conn);
 
-        $sql = "INSERT INTO stock (perfume_id, quantity) VALUES (?, ?)";
+        $sql = "INSERT INTO stock (product_id, quantity) VALUES (?, ?)";
         $stmt2 = mysqli_prepare($conn, $sql);
-        mysqli_stmt_bind_param($stmt2, 'ii', $perfume_id, $qty);
+        mysqli_stmt_bind_param($stmt2, 'ii', $product_id, $qty);
         mysqli_stmt_execute($stmt2);
 
         mysqli_commit($conn);
     } catch (mysqli_sql_exception $e) {
         mysqli_rollback($conn);
-        $_SESSION['message'] = 'Could not save the perfume: ' . $e->getMessage();
+        $_SESSION['message'] = 'Could not save the product: ' . $e->getMessage();
         header("Location: create.php");
         exit();
     }
 
-    // clear the saved form values
-    unset($_SESSION['perfumeName'], $_SESSION['brand'], $_SESSION['scent'], $_SESSION['size'], $_SESSION['cost'], $_SESSION['sell'], $_SESSION['qty']);
-
-    $_SESSION['success'] = 'Perfume added successfully';
+    $_SESSION['success'] = 'Product added successfully';
     header("Location: index.php");
     exit();
 }

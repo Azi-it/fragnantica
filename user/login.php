@@ -23,7 +23,7 @@ if (isset($_POST['submit'])) {
 
                 // admins go to the admin page, customers go to the store
                 if ($row['role'] === 'admin') {
-                    header("Location: ../perfume/index.php");
+                    header("Location: ../product/index.php");
                 } else {
                     header("Location: ../index.php");
                 }

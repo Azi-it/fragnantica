@@ -13,13 +13,13 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"
         integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous">
     </script>
-    <title>Perfume Store</title>
+    <title>Fragrance &amp; Scent Store</title>
 </head>
 
 <body>
     <nav class="navbar navbar-expand-lg bg-body-tertiary">
         <div class="container-fluid">
-            <a class="navbar-brand" href="/Fragnantica/index.php">Perfume Store</a>
+            <a class="navbar-brand" href="/Fragnantica/index.php">Fragrance &amp; Scent Store</a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
                 data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false"
                 aria-label="Toggle navigation">
@@ -33,18 +33,23 @@
                     <?php
                     // admin-only links
                     if (isset($_SESSION['role']) && $_SESSION['role'] === 'admin') {
-                        echo '<li class="nav-item"><a class="nav-link" href="/Fragnantica/perfume/index.php">Perfumes</a></li>';
-                        echo '<li class="nav-item"><a class="nav-link" href="/Fragnantica/perfume/create.php">Add Perfume</a></li>';
+                        echo '<li class="nav-item"><a class="nav-link" href="/Fragnantica/product/index.php">Products</a></li>';
+                        echo '<li class="nav-item"><a class="nav-link" href="/Fragnantica/product/create.php">Add Product</a></li>';
                     }
 
                     // links for any logged in user
                     if (isset($_SESSION['user_id'])) {
                         echo '<li class="nav-item"><a class="nav-link" href="/Fragnantica/user/profile.php">My Profile</a></li>';
                     }
+
+                    if (isset($_SESSION['role']) && $_SESSION['role'] === 'customer') {
+                        echo '<li class="nav-item"><a class="nav-link" href="/Fragnantica/cart/index.php"><i class="fa-solid fa-cart-shopping"></i> Cart</a></li>';
+                        echo '<li class="nav-item"><a class="nav-link" href="/Fragnantica/cart/orders.php"><i class="fa-solid fa-box"></i> My Orders</a></li>';
+                    }
                     ?>
                 </ul>
                 <form action="/Fragnantica/index.php" method="GET" class="d-flex" role="search">
-                    <input class="form-control me-2" type="search" placeholder="Search name or brand" aria-label="Search"
+                    <input class="form-control me-2" type="search" placeholder="Search products" aria-label="Search"
                         name="search" value="<?php if (isset($_GET['search'])) echo htmlentities($_GET['search']); ?>">
                     <button class="btn btn-outline-success" type="submit">Search</button>
                 </form>
