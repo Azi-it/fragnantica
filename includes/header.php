@@ -69,3 +69,10 @@
             </div>
         </div>
     </nav>
+    <?php if (!empty($_SESSION['default_password'])): ?>
+        <div class="alert alert-danger rounded-0 mb-0 text-center py-2" role="alert">
+            <i class="fa-solid fa-triangle-exclamation me-1"></i>
+            <strong>Your admin password is the published default.</strong> Anyone could log in as you.
+            <a href="/Fragnantica/user/profile.php" class="alert-link">Change it now</a>.
+        </div>
+    <?php endif; ?>

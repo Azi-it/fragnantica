@@ -7,9 +7,9 @@
 -- How to import: open phpMyAdmin > Import > choose this file > Go
 -- WARNING: importing this file again deletes all data in these tables.
 --
--- Default admin account (created at the bottom of this file):
---   email:    admin@fragrancestore.com
---   password: admin123
+-- There is no built-in admin account. After importing, open
+--   http://localhost/Fragnantica/setup.php
+-- on the same computer and create the admin with your own email and password.
 
 SET NAMES utf8mb4;
 
@@ -146,10 +146,6 @@ CREATE TABLE password_resets (
 CREATE INDEX idx_product_brand ON product (brand);
 CREATE INDEX idx_product_scent ON product (scent_type);
 CREATE INDEX idx_product_price ON product (sell_price);
-
--- default admin account (password is admin123, hashed with password_hash)
-INSERT INTO users (name, email, password, role, created_at)
-VALUES ('Administrator', 'admin@fragrancestore.com', '$2y$10$SIs15BU7A1.aVRjndlosaOEif6SkHizhqse5v90PqKeYel2Y/W8YC', 'admin', now());
 
 -- categories
 INSERT INTO category (category_id, name) VALUES

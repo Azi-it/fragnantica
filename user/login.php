@@ -1,6 +1,7 @@
 <?php
 session_start();
 include("../includes/config.php");
+include("../includes/functions.php");
 
 if (isset($_POST['submit'])) {
 
@@ -23,6 +24,15 @@ if (isset($_POST['submit'])) {
                 $_SESSION['email'] = $row['email'];
                 $_SESSION['role'] = $row['role'];
 
+                // an admin still using a password that was published with this project
+                // must change it before doing anything else
+                if ($row['role'] === 'admin' && in_array($password, KNOWN_DEFAULT_PASSWORDS, true)) {
+                    $_SESSION['default_password'] = true;
+                    $_SESSION['message'] = 'You are using the default admin password, which is published online. Change it now below.';
+                    header("Location: profile.php");
+                    exit();
+                }
+
                 // admins go to the dashboard, customers go to the store
                 if ($row['role'] === 'admin') {
                     header("Location: ../admin/index.php");
@@ -39,12 +49,20 @@ if (isset($_POST['submit'])) {
     }
 }
 
+// a freshly imported store has no admin yet: point to the setup page
+$noAdmin = (int)mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) AS total FROM users WHERE role = 'admin'"))['total'] === 0;
+
 include("../includes/header.php");
 ?>
 <div class="row col-md-6 mx-auto mt-4">
     <h2>Login</h2>
     <?php include("../includes/alert.php"); ?>
-    <form action="<?php echo $_SERVER['PHP_SELF']; ?>" method="POST">
+    <?php if ($noAdmin): ?>
+        <div class="alert alert-info">
+            This store has no admin account yet. <a href="../setup.php" class="alert-link">Set up your store</a> to create one.
+        </div>
+    <?php endif; ?>
+    <form action="login.php" method="POST">
         <!-- Email input -->
         <div class="mb-3">
             <label class="form-label" for="email">Email address</label>

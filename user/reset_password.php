@@ -36,6 +36,8 @@ if ($reset && $_SERVER['REQUEST_METHOD'] === 'POST') {
         $_SESSION['message'] = 'password should be at least 6 characters';
     } else if ($password !== $confirm) {
         $_SESSION['message'] = 'passwords do not match';
+    } else if (in_array($password, KNOWN_DEFAULT_PASSWORDS, true)) {
+        $_SESSION['message'] = 'that password was published with this project; please choose another';
     } else {
         mysqli_begin_transaction($conn);
         try {
@@ -55,6 +57,9 @@ if ($reset && $_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         notify_password_changed($reset['email'], $reset['name']);
+        if (isset($_SESSION['user_id']) && (int)$_SESSION['user_id'] === (int)$reset['user_id']) {
+            unset($_SESSION['default_password']);
+        }
 
         $_SESSION['success'] = 'Your password has been changed. You can now log in with the new password.';
         header("Location: login.php");

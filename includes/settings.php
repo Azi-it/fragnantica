@@ -22,3 +22,12 @@ define('LOW_STOCK_THRESHOLD', 5);
 
 // how long a password reset link stays valid, in minutes
 define('RESET_LINK_MINUTES', 60);
+
+// setup.php (create the first admin) only works from the computer the store runs on.
+// on a hosted server you cannot use localhost: set this to true, run setup.php straight
+// after uploading, then set it back to false.
+define('ALLOW_REMOTE_SETUP', false);
+
+// passwords that were published with older versions of this project.
+// an admin who logs in with one of these is sent to change it.
+define('KNOWN_DEFAULT_PASSWORDS', array('admin123'));

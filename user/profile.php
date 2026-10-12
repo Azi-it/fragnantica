@@ -31,12 +31,15 @@ if (isset($_POST['change_password'])) {
         $_SESSION['message'] = 'the new passwords do not match';
     } else if ($new === $current) {
         $_SESSION['message'] = 'the new password must be different from the current one';
+    } else if (in_array($new, KNOWN_DEFAULT_PASSWORDS, true)) {
+        $_SESSION['message'] = 'that password was published with this project; please choose another';
     } else {
         try {
             mysqli_execute_query($conn, "UPDATE users SET password = ? WHERE user_id = ?", [password_hash($new, PASSWORD_BCRYPT), $user_id]);
             // any reset links that were still waiting can no longer be used
             mysqli_execute_query($conn, "UPDATE password_resets SET used_at = NOW() WHERE user_id = ? AND used_at IS NULL", [$user_id]);
             session_regenerate_id(true);
+            unset($_SESSION['default_password']);
             notify_password_changed($account['email'], $account['name']);
             $_SESSION['success'] = 'password changed';
         } catch (mysqli_sql_exception $e) {
