@@ -3,11 +3,7 @@ session_start();
 include('../includes/config.php');
 include('../includes/functions.php');
 
-if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'customer') {
-    $_SESSION['message'] = 'please log in with a customer account';
-    header("Location: ../user/login.php");
-    exit();
-}
+require_customer();
 
 $user_id = $_SESSION['user_id'];
 
@@ -63,7 +59,7 @@ include('../includes/header.php');
                         </td>
                         <td><?= peso($row['sell_price']) ?></td>
                         <td>
-                            <form action="update.php" method="POST" class="d-flex gap-1">
+                            <form action="update.php" method="POST" class="d-flex gap-1" novalidate>
                                 <?= csrf_field() ?>
                                 <input type="hidden" name="product_id" value="<?= $id ?>">
                                 <input type="number" name="quantity" value="<?= (int)$row['quantity'] ?>" min="0" max="<?= $stock ?>"

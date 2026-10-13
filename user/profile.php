@@ -4,13 +4,45 @@ include("../includes/config.php");
 include("../includes/functions.php");
 
 // only logged in users can open their profile
-if (!isset($_SESSION['user_id'])) {
-    $_SESSION['message'] = 'please log in first';
-    header("Location: login.php");
-    exit();
-}
+require_login();
 
 $user_id = $_SESSION['user_id'];
+
+// ---------- profile photo: upload a new one, or remove it ----------
+if (isset($_POST['upload_photo']) || isset($_POST['remove_photo'])) {
+    $sql = "SELECT img_path FROM users WHERE user_id = ? LIMIT 1";
+    $oldPhoto = mysqli_fetch_assoc(mysqli_execute_query($conn, $sql, [$user_id]))['img_path'] ?? null;
+
+    if (!csrf_valid()) {
+        $_SESSION['message'] = 'Your session expired. Please try again.';
+    } else if (isset($_POST['remove_photo'])) {
+        mysqli_execute_query($conn, "UPDATE users SET img_path = NULL WHERE user_id = ?", [$user_id]);
+        if ($oldPhoto) {
+            delete_photo_file(__DIR__ . '/../' . $oldPhoto);
+        }
+        $_SESSION['success'] = 'profile photo removed';
+    } else {
+        $photo = isset($_FILES['photo']) ? $_FILES['photo'] : null;
+        $error = photo_upload_error($photo, true);
+        $fileName = $error === '' ? save_photo($photo, __DIR__ . '/images') : '';
+
+        if ($error !== '') {
+            $_SESSION['message'] = $error;
+        } else if ($fileName === '') {
+            $_SESSION['message'] = 'The photo could not be saved. Please try again.';
+        } else {
+            mysqli_execute_query($conn, "UPDATE users SET img_path = ? WHERE user_id = ?", ['user/images/' . $fileName, $user_id]);
+            // the old photo file is not needed anymore
+            if ($oldPhoto) {
+                delete_photo_file(__DIR__ . '/../' . $oldPhoto);
+            }
+            $_SESSION['photo'] = 'user/images/' . $fileName;
+            $_SESSION['success'] = 'profile photo updated';
+        }
+    }
+    header("Location: profile.php");
+    exit();
+}
 
 // ---------- change password ----------
 if (isset($_POST['change_password'])) {
@@ -97,7 +129,7 @@ if (isset($_POST['submit'])) {
 }
 
 // get the saved details (customer columns are empty if the profile is not filled in yet)
-$sql = "SELECT u.name, u.email, c.addressline, c.town, c.zipcode, c.phone FROM users u LEFT JOIN customer c USING (user_id) WHERE u.user_id=? LIMIT 1";
+$sql = "SELECT u.name, u.email, u.img_path, u.role, c.addressline, c.town, c.zipcode, c.phone FROM users u LEFT JOIN customer c USING (user_id) WHERE u.user_id=? LIMIT 1";
 $result = mysqli_execute_query($conn, $sql, [$user_id]);
 $profile = mysqli_fetch_assoc($result);
 
@@ -118,10 +150,27 @@ include("../includes/header.php");
     <div class="row">
         <div class="col-xl-8 mx-auto">
             <div class="card mb-4">
+                <div class="card-header">Profile Photo</div>
+                <div class="card-body d-flex flex-wrap align-items-center gap-4">
+                    <?= avatar($profile['name'], $profile['img_path'], 120) ?>
+                    <form action="profile.php" method="POST" enctype="multipart/form-data" class="flex-fill" novalidate>
+                        <?= csrf_field() ?>
+                        <label class="small mb-1" for="photo">Upload a new photo (JPG or PNG, up to <?= MAX_PHOTO_BYTES / 1024 / 1024 ?> MB)</label>
+                        <input class="form-control mb-2" id="photo" type="file" name="photo" accept=".jpg,.jpeg,.png">
+                        <button class="btn btn-primary" type="submit" name="upload_photo">Upload photo</button>
+                        <?php if ($profile['img_path']): ?>
+                            <button class="btn btn-outline-danger" type="submit" name="remove_photo"
+                                onclick="return confirm('Remove your profile photo?');">Remove photo</button>
+                        <?php endif; ?>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card mb-4">
                 <div class="card-header">My Profile</div>
                 <div class="card-body">
                     <p class="small text-muted">These details will be used as the delivery information for your orders.</p>
-                    <form action="profile.php" method="POST">
+                    <form action="profile.php" method="POST" novalidate>
                         <?= csrf_field() ?>
                         <div class="row gx-3 mb-3">
                             <div class="col-md-6">
@@ -156,7 +205,7 @@ include("../includes/header.php");
                             </div>
                             <div class="col-md-6">
                                 <label class="small mb-1" for="phone">Phone Number</label>
-                                <input class="form-control" id="phone" type="tel" placeholder="e.g. 09171234567"
+                                <input class="form-control" id="phone" type="text" placeholder="e.g. 09171234567"
                                     name="phone" value="<?= e($profile['phone']) ?>">
                             </div>
                         </div>
@@ -169,20 +218,20 @@ include("../includes/header.php");
             <div class="card mb-4">
                 <div class="card-header">Change Password</div>
                 <div class="card-body">
-                    <form action="profile.php" method="POST" autocomplete="off">
+                    <form action="profile.php" method="POST" autocomplete="off" novalidate>
                         <?= csrf_field() ?>
                         <div class="row gx-3 mb-3">
                             <div class="col-md-4">
                                 <label class="small mb-1" for="current_password">Current password</label>
-                                <input class="form-control" id="current_password" type="password" name="current_password" required>
+                                <input class="form-control" id="current_password" type="password" name="current_password">
                             </div>
                             <div class="col-md-4">
                                 <label class="small mb-1" for="new_password">New password</label>
-                                <input class="form-control" id="new_password" type="password" name="new_password" minlength="6" required>
+                                <input class="form-control" id="new_password" type="password" name="new_password">
                             </div>
                             <div class="col-md-4">
                                 <label class="small mb-1" for="confirm_password">Confirm new password</label>
-                                <input class="form-control" id="confirm_password" type="password" name="confirm_password" minlength="6" required>
+                                <input class="form-control" id="confirm_password" type="password" name="confirm_password">
                             </div>
                         </div>
                         <button class="btn btn-outline-primary" type="submit" name="change_password">Change password</button>

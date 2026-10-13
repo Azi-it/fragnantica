@@ -1,9 +1,212 @@
 <?php
-// shared helpers: output escaping, CSRF protection, order statuses and payment methods
+// shared helpers: login checks, output escaping, form helpers, CSRF protection,
+// order statuses and payment methods
 // include this after config.php (it needs $conn for the order functions)
 
 require_once __DIR__ . '/settings.php';
 require_once __DIR__ . '/mail.php';
+require_once __DIR__ . '/uploads.php';
+require_once __DIR__ . '/profanity.php';
+
+// ---------------------------------------------------------------
+// login and access control
+//   require_login()    any logged in user
+//   require_customer() customers only (cart, checkout, reviews)
+//   require_admin()    admins only (every CRUD page and script)
+// a visitor who is not logged in is sent to the login page with a message,
+// and comes back to the page they wanted after logging in.
+// a logged in customer who opens an admin page is sent to the home page.
+// ---------------------------------------------------------------
+
+// send the visitor to the login page with a message, remembering where they wanted to go
+function redirect_to_login($message)
+{
+    if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_SERVER['REQUEST_URI'])) {
+        $_SESSION['after_login'] = $_SERVER['REQUEST_URI'];
+    }
+    // keep a message that is already waiting (e.g. "your account was deactivated")
+    if (empty($_SESSION['message'])) {
+        $_SESSION['message'] = $message;
+    }
+    header('Location: ' . BASE_PATH . '/user/login.php');
+    exit();
+}
+
+function require_login()
+{
+    if (!isset($_SESSION['user_id'])) {
+        redirect_to_login('Please log in to continue.');
+    }
+}
+
+function require_customer()
+{
+    if (!isset($_SESSION['user_id'])) {
+        redirect_to_login('Please log in with your customer account to continue.');
+    }
+    if ($_SESSION['role'] !== 'customer') {
+        $_SESSION['message'] = 'That page is for customers. Admin accounts cannot shop or write reviews.';
+        header('Location: ' . BASE_PATH . '/index.php');
+        exit();
+    }
+}
+
+function require_admin()
+{
+    if (!isset($_SESSION['user_id'])) {
+        redirect_to_login('Please log in with an admin account to open that page.');
+    }
+    if ($_SESSION['role'] !== 'admin') {
+        http_response_code(403);
+        $_SESSION['message'] = 'Access denied. Only administrators can open that page.';
+        header('Location: ' . BASE_PATH . '/index.php');
+        exit();
+    }
+}
+
+function is_admin()
+{
+    return isset($_SESSION['role']) && $_SESSION['role'] === 'admin';
+}
+
+function is_customer()
+{
+    return isset($_SESSION['role']) && $_SESSION['role'] === 'customer';
+}
+
+// the page to open after logging in: the page the user was sent away from, if it is one of ours
+function after_login_url($role)
+{
+    $target = isset($_SESSION['after_login']) ? (string)$_SESSION['after_login'] : '';
+    unset($_SESSION['after_login']);
+    if ($target !== '' && strpos($target, BASE_PATH . '/') === 0 && strpos($target, '//') === false
+        && !preg_match('/[\r\n]/', $target) && strpos($target, '/user/login.php') === false) {
+        return $target;
+    }
+    return BASE_PATH . ($role === 'admin' ? '/admin/index.php' : '/index.php');
+}
+
+// read the logged in user again on every page, so a change made by an admin
+// (deactivated account, new role, new name or photo) takes effect straight away
+function sync_session_user($conn)
+{
+    if (!isset($_SESSION['user_id'])) {
+        return;
+    }
+    try {
+        $sql = "SELECT name, email, img_path, role, status FROM users WHERE user_id = ? LIMIT 1";
+        $user = mysqli_fetch_assoc(mysqli_execute_query($conn, $sql, [$_SESSION['user_id']]));
+    } catch (mysqli_sql_exception $e) {
+        die('The database is out of date. In phpMyAdmin, import <b>migrations/003_users_photos_reviews_views.sql</b> and reload this page.');
+    }
+
+    if (!$user || $user['status'] !== 'active') {
+        $_SESSION = array();
+        session_regenerate_id(true);
+        $_SESSION['message'] = 'Your account has been deactivated, so you have been logged out. Please contact the store if you think this is a mistake.';
+        return;
+    }
+    $_SESSION['name'] = $user['name'];
+    $_SESSION['email'] = $user['email'];
+    $_SESSION['role'] = $user['role'];
+    $_SESSION['photo'] = $user['img_path'];
+}
+
+// ---------------------------------------------------------------
+// form helpers
+// validation is done in PHP only; forms use "novalidate" so the browser does not check them
+// ---------------------------------------------------------------
+
+// a submitted text field, trimmed; '' when it is missing or not text
+function post_value($key)
+{
+    return isset($_POST[$key]) && is_string($_POST[$key]) ? trim($_POST[$key]) : '';
+}
+
+// after a failed submit: remember the errors and what was typed, for the form to show once
+function keep_form($form, $errors, $old)
+{
+    $_SESSION['forms'][$form] = array('errors' => $errors, 'old' => $old);
+}
+
+// take back what keep_form() remembered (and forget it): array($errors, $old)
+function take_form($form)
+{
+    $saved = isset($_SESSION['forms'][$form]) ? $_SESSION['forms'][$form] : array('errors' => array(), 'old' => array());
+    unset($_SESSION['forms'][$form]);
+    return array($saved['errors'], $saved['old']);
+}
+
+// " is-invalid" for a field with an error (Bootstrap shows a red border)
+function invalid_class($errors, $field)
+{
+    return isset($errors[$field]) ? ' is-invalid' : '';
+}
+
+// the error message under a field
+function field_error($errors, $field)
+{
+    return isset($errors[$field]) ? "<div class='invalid-feedback d-block'>" . e($errors[$field]) . "</div>" : '';
+}
+
+// check a user's name and email; $ignoreUserId lets a user keep their own email when editing.
+// returns the errors as array(field => message)
+function user_field_errors($conn, $name, $email, $ignoreUserId = 0)
+{
+    $errors = array();
+    if ($name === '') {
+        $errors['name'] = 'Please enter a name.';
+    } else if (mb_strlen($name) > 100) {
+        $errors['name'] = 'The name should be 100 characters or less.';
+    }
+    if ($email === '') {
+        $errors['email'] = 'Please enter an email address.';
+    } else if (strlen($email) > 100 || filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
+        $errors['email'] = 'Please enter a valid email address.';
+    } else {
+        $sql = "SELECT user_id FROM users WHERE email = ? AND user_id <> ? LIMIT 1";
+        if (mysqli_fetch_assoc(mysqli_execute_query($conn, $sql, [$email, (int)$ignoreUserId]))) {
+            $errors['email'] = 'This email is already used by another account.';
+        }
+    }
+    return $errors;
+}
+
+// ---------------------------------------------------------------
+// pictures
+// ---------------------------------------------------------------
+
+// a user's profile photo, or a circle with their initials when they have none
+function avatar($name, $imgPath, $size = 40)
+{
+    $size = (int)$size;
+    if ($imgPath !== null && $imgPath !== '') {
+        return "<img src='" . e(BASE_PATH . '/' . $imgPath) . "' alt='' class='avatar' width='{$size}' height='{$size}'>";
+    }
+    $initials = '';
+    foreach (array_slice(preg_split('/\s+/', trim((string)$name)), 0, 2) as $part) {
+        $initials .= mb_strtoupper(mb_substr($part, 0, 1));
+    }
+    $font = round($size * 0.4);
+    return "<span class='avatar avatar-initials' style='width:{$size}px;height:{$size}px;font-size:{$font}px;' aria-hidden='true'>" . e($initials) . "</span>";
+}
+
+// 1 to 5 stars; halves are shown for averages like 4.5
+function stars($rating)
+{
+    $rating = (float)$rating;
+    $html = "<span class='stars' title='" . e(number_format($rating, 1)) . " out of 5'>";
+    for ($i = 1; $i <= 5; $i++) {
+        if ($rating >= $i) {
+            $html .= "<i class='fa-solid fa-star'></i>";
+        } else if ($rating >= $i - 0.5) {
+            $html .= "<i class='fa-solid fa-star-half-stroke'></i>";
+        } else {
+            $html .= "<i class='fa-regular fa-star'></i>";
+        }
+    }
+    return $html . "<span class='visually-hidden'>" . e(number_format($rating, 1)) . " out of 5 stars</span></span>";
+}
 
 // ---------------------------------------------------------------
 // output
@@ -283,4 +486,22 @@ function change_order_status($conn, $order_id, $newStatus, $actor_id, $role, $no
         return array(true, "Order #{$order_id} was cancelled and its items were returned to stock.");
     }
     return array(true, "Order #{$order_id} is now " . status_label($newStatus) . ".");
+}
+
+// ---------------------------------------------------------------
+// reviews
+// ---------------------------------------------------------------
+
+// a customer may review a product once they have received it (a completed order with that product)
+function can_review_product($conn, $user_id, $product_id)
+{
+    $sql = "SELECT 1 FROM order_details_view WHERE user_id = ? AND product_id = ? AND status = 'completed' LIMIT 1";
+    return (bool)mysqli_fetch_assoc(mysqli_execute_query($conn, $sql, [$user_id, $product_id]));
+}
+
+// ---------------------------------------------------------------
+// every page that includes this file checks the logged in account again
+// ---------------------------------------------------------------
+if (session_status() === PHP_SESSION_ACTIVE && isset($conn) && $conn instanceof mysqli) {
+    sync_session_user($conn);
 }

@@ -247,3 +247,143 @@ ul.products li h3 a:hover {
     padding-top: 4px;
     font-variant-numeric: tabular-nums;
 }
+
+/* profile photos */
+.avatar {
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+}
+
+.avatar-initials {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #8B1E3F;
+    color: #FFFFFF;
+    font-family: "Trebuchet MS", Arial, Helvetica, sans-serif;
+    font-weight: bold;
+}
+
+
+/* product photo gallery */
+.gallery-thumbs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.gallery-thumbs button {
+    padding: 2px;
+    border: 2px solid #EAEAEA;
+    background-color: #FFFFFF;
+    border-radius: 4px;
+}
+
+.gallery-thumbs button.active,
+.gallery-thumbs button:hover {
+    border-color: #8B1E3F;
+}
+
+.gallery-thumbs img {
+    width: 64px;
+    height: 64px;
+    object-fit: contain;
+    display: block;
+}
+
+/* extra photos on the edit product page */
+.photo-tile {
+    width: 110px;
+    text-align: center;
+}
+
+.photo-tile img {
+    width: 100px;
+    height: 100px;
+    object-fit: contain;
+    border: 1px solid #EAEAEA;
+    background-color: #FFFFFF;
+}
+
+/* star ratings */
+.stars {
+    color: #E0A100;
+    white-space: nowrap;
+}
+
+/* the 1 to 5 star picker in the review form (radio buttons drawn as stars) */
+.star-input {
+    display: inline-flex;
+    flex-direction: row-reverse;
+    gap: 4px;
+}
+
+.star-input input {
+    position: absolute;
+    opacity: 0;
+    width: 1px;
+    height: 1px;
+}
+
+.star-input label {
+    font-size: 1.6em;
+    color: #CCCCCC;
+    cursor: pointer;
+}
+
+.star-input input:checked ~ label,
+.star-input label:hover,
+.star-input label:hover ~ label {
+    color: #E0A100;
+}
+
+.star-input input:focus-visible + label {
+    outline: 2px solid #8B1E3F;
+    outline-offset: 2px;
+}
+
+/* reviews on the product page */
+.review {
+    border-bottom: 1px solid #F0F0F0;
+    padding: 14px 0;
+}
+
+.review:last-child {
+    border-bottom: 0;
+}
+
+.review-comment {
+    white-space: pre-line;
+    margin: 6px 0 0;
+}
+
+.rating-summary .big-number {
+    font-family: "Trebuchet MS", Arial, Helvetica, sans-serif;
+    font-size: 2.6em;
+    line-height: 1;
+}
+
+.rating-bar {
+    height: 8px;
+    background-color: #F0F0F0;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.rating-bar span {
+    display: block;
+    height: 100%;
+    background-color: #E0A100;
+}
+
+/* small rating line on the product cards */
+ul.products li .stars {
+    font-size: 0.8em;
+}
+
+/* the search box on the home page */
+.home-search {
+    max-width: 700px;
+}

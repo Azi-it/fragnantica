@@ -4,11 +4,7 @@ include('../includes/config.php');
 include('../includes/functions.php');
 
 // 1. Must be logged in as customer
-if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'customer') {
-    $_SESSION['message'] = 'please log in with a customer account';
-    header("Location: ../user/login.php");
-    exit();
-}
+require_customer();
 
 $user_id = $_SESSION['user_id'];
 $methods = payment_methods();

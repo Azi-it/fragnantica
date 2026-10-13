@@ -4,11 +4,7 @@ include('../includes/config.php');
 include('../includes/functions.php');
 
 // only admins can manage orders
-if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'admin') {
-    $_SESSION['message'] = 'admin access only, please log in with an admin account';
-    header("Location: ../user/login.php");
-    exit();
-}
+require_admin();
 
 $order_id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
 if (!$order_id) {
@@ -16,10 +12,8 @@ if (!$order_id) {
     exit();
 }
 
-$sql = "SELECT o.*, u.name AS customer_name, u.email AS customer_email
-        FROM orders o
-        INNER JOIN users u USING (user_id)
-        WHERE o.order_id = ? LIMIT 1";
+// the order, its customer and totals (order_summary_view view)
+$sql = "SELECT * FROM order_summary_view WHERE order_id = ? LIMIT 1";
 $order = mysqli_fetch_assoc(mysqli_execute_query($conn, $sql, [$order_id]));
 
 if (!$order) {
@@ -28,11 +22,12 @@ if (!$order) {
     exit();
 }
 
-$itemsSql = "SELECT oi.product_id, oi.quantity, oi.price, p.name, p.brand, p.size, p.unit, p.img_path, s.quantity AS stock
-             FROM order_items oi
-             INNER JOIN product p USING (product_id)
+// one row per product with its subtotal (order_details_view view), plus the stock left now
+$itemsSql = "SELECT d.product_id, d.quantity, d.price, d.subtotal, d.product_name AS name, d.brand, d.size, d.unit, d.img_path, s.quantity AS stock
+             FROM order_details_view d
              LEFT JOIN stock s USING (product_id)
-             WHERE oi.order_id = ?";
+             WHERE d.order_id = ?
+             ORDER BY d.order_item_id";
 $items = mysqli_fetch_all(mysqli_execute_query($conn, $itemsSql, [$order_id]), MYSQLI_ASSOC);
 
 $historySql = "SELECT h.status, h.note, h.changed_at, u.name AS changed_by_name, u.role AS changed_by_role
@@ -60,7 +55,11 @@ include('../includes/header.php');
 
     <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
         <h2 class="mb-0">Order #<?= (int)$order['order_id'] ?></h2>
-        <div><?= status_badge($order['status']) ?> <?= payment_badge($order['payment_status']) ?></div>
+        <div class="d-flex flex-wrap align-items-center gap-2">
+            <?= status_badge($order['status']) ?> <?= payment_badge($order['payment_status']) ?>
+            <a href="receipt.php?id=<?= (int)$order['order_id'] ?>" target="_blank" class="btn btn-sm btn-outline-secondary">
+                <i class="fa-regular fa-file-pdf me-1"></i> Receipt (PDF)</a>
+        </div>
     </div>
 
     <?= order_progress($order['status']) ?>
@@ -88,13 +87,13 @@ include('../includes/header.php');
                                 </td>
                                 <td><?= peso($item['price']) ?></td>
                                 <td><?= (int)$item['quantity'] ?></td>
-                                <td><?= peso($item['price'] * $item['quantity']) ?></td>
+                                <td><?= peso($item['subtotal']) ?></td>
                                 <td><?= (int)$item['stock'] ?></td>
                             </tr>
                         <?php endforeach; ?>
                         </tbody>
                         <tfoot class="table-light">
-                            <tr><th colspan="3" class="text-end">Total</th><th colspan="2"><?= peso($order['total_amount']) ?></th></tr>
+                            <tr><th colspan="3" class="text-end">Grand Total</th><th colspan="2"><?= peso($order['grand_total']) ?></th></tr>
                         </tfoot>
                     </table>
                 </div>
@@ -142,7 +141,7 @@ include('../includes/header.php');
                     <?php if ($order['payment_status'] === 'paid' && $order['paid_at']): ?>
                         <p class="small text-muted mb-0">Paid on <?= date('M j, Y, g:i a', strtotime($order['paid_at'])) ?></p>
                     <?php elseif ($order['payment_method'] === 'cod' && $order['status'] !== 'cancelled'): ?>
-                        <p class="small text-muted mb-0">Collect <?= peso($order['total_amount']) ?> on delivery. It is marked paid when you complete the order.</p>
+                        <p class="small text-muted mb-0">Collect <?= peso($order['grand_total']) ?> on delivery. It is marked paid when you complete the order.</p>
                     <?php endif; ?>
                 </div>
             </div>
@@ -153,11 +152,12 @@ include('../includes/header.php');
                     <?php if (empty($next)): ?>
                         <p class="text-muted mb-0">This order is <?= e(strtolower(status_label($order['status']))) ?>. No further changes are possible.</p>
                     <?php else: ?>
-                        <form action="update_status.php" method="POST">
+                        <form action="update_status.php" method="POST" novalidate>
                             <?= csrf_field() ?>
                             <input type="hidden" name="order_id" value="<?= (int)$order['order_id'] ?>">
+                            <p class="small text-muted">The customer is emailed the new status, the products with their subtotals and the grand total, and the PDF receipt.</p>
                             <label for="note" class="form-label small">Note (optional, the customer can see it)</label>
-                            <input type="text" class="form-control mb-3" id="note" name="note" maxlength="255" placeholder="e.g. Shipped via LBC, tracking 1234">
+                            <input type="text" class="form-control mb-3" id="note" name="note" placeholder="e.g. Shipped via LBC, tracking 1234">
                             <div class="d-grid gap-2">
                                 <?php foreach ($next as $target):
                                     $a = $actions[$target];

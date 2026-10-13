@@ -3,11 +3,7 @@ session_start();
 include('../includes/config.php');
 include('../includes/functions.php');
 
-if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'customer') {
-    $_SESSION['message'] = 'please log in with a customer account';
-    header("Location: ../user/login.php");
-    exit();
-}
+require_customer();
 
 $user_id = $_SESSION['user_id'];
 $order_id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
@@ -17,9 +13,9 @@ if (!$order_id) {
     exit();
 }
 
-// Fetch order scoped to current user
-$orderSql = "SELECT order_id, total_amount, status, shipping_address, payment_method, payment_status, paid_at, created_at
-             FROM orders
+// Fetch order scoped to current user (order_summary_view view)
+$orderSql = "SELECT order_id, grand_total, status, shipping_address, payment_method, payment_status, paid_at, created_at
+             FROM order_summary_view
              WHERE order_id = ? AND user_id = ?
              LIMIT 1";
 $orderResult = mysqli_execute_query($conn, $orderSql, [$order_id, $user_id]);
@@ -31,11 +27,13 @@ if (!$order) {
     exit();
 }
 
-// Fetch order items
-$itemsSql = "SELECT oi.product_id, oi.quantity, oi.price, p.name, p.brand, p.size, p.unit, p.img_path
-             FROM order_items oi
-             INNER JOIN product p USING (product_id)
-             WHERE oi.order_id = ?";
+// Fetch order items with their subtotals (order_details_view view),
+// and whether this customer already reviewed each product
+$itemsSql = "SELECT d.product_id, d.quantity, d.price, d.subtotal, d.product_name AS name, d.brand, d.size, d.unit, d.img_path,
+                    (SELECT r.review_id FROM review r WHERE r.product_id = d.product_id AND r.user_id = d.user_id) AS review_id
+             FROM order_details_view d
+             WHERE d.order_id = ?
+             ORDER BY d.order_item_id";
 $itemsResult = mysqli_execute_query($conn, $itemsSql, [$order_id]);
 $items = mysqli_fetch_all($itemsResult, MYSQLI_ASSOC);
 
@@ -91,12 +89,16 @@ include('../includes/header.php');
                                 <div>
                                     <a href="../product/view.php?id=<?= (int)$item['product_id'] ?>"><strong><?= e($item['name']) ?></strong></a><br>
                                     <small class="text-muted"><?= e($item['brand']) ?> &middot; <?= (int)$item['size'] ?> <?= e($item['unit']) ?></small>
+                                    <?php if ($order['status'] === 'completed'): ?>
+                                        <br><a href="../product/view.php?id=<?= (int)$item['product_id'] ?>#reviews" class="small">
+                                            <i class="fa-regular fa-star"></i> <?= $item['review_id'] ? 'Edit your review' : 'Write a review' ?></a>
+                                    <?php endif; ?>
                                 </div>
                             </div>
                         </td>
                         <td><?= peso($item['price']) ?></td>
                         <td><?= (int)$item['quantity'] ?></td>
-                        <td><?= peso($item['price'] * $item['quantity']) ?></td>
+                        <td><?= peso($item['subtotal']) ?></td>
                     </tr>
                 <?php endforeach; ?>
                 </tbody>
@@ -113,7 +115,7 @@ include('../includes/header.php');
                             }
                             ?>
                         </th>
-                        <th><?= peso($order['total_amount']) ?></th>
+                        <th><?= peso($order['grand_total']) ?></th>
                     </tr>
                 </tfoot>
             </table>
@@ -135,6 +137,8 @@ include('../includes/header.php');
 
             <div class="d-flex flex-wrap justify-content-between gap-2 mt-4">
                 <a href="orders.php" class="btn btn-secondary"><i class="fa-solid fa-box me-1"></i> All My Orders</a>
+                <a href="../order/receipt.php?id=<?= (int)$order['order_id'] ?>" target="_blank" class="btn btn-outline-secondary">
+                    <i class="fa-regular fa-file-pdf me-1"></i> Receipt (PDF)</a>
                 <?php if ($canCancel): ?>
                     <form action="cancel_order.php" method="POST" onsubmit="return confirm('Cancel order #<?= (int)$order['order_id'] ?>? This cannot be undone.');">
                         <?= csrf_field() ?>

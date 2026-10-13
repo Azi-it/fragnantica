@@ -2,9 +2,14 @@
 // email: one send_mail() function plus the store's email templates
 // loaded by includes/functions.php; uses the settings in includes/settings.php
 
+require_once __DIR__ . '/smtp.php';
+require_once __DIR__ . '/pdf.php';
+require_once __DIR__ . '/receipt.php';
+
 // send (or, with MAIL_DRIVER 'log', save) one HTML email. returns true on success.
+// $attachments: list of array('name' => ..., 'type' => ..., 'data' => raw bytes)
 // a failed email never stops the page: callers carry on either way.
-function send_mail($to, $subject, $contentHtml)
+function send_mail($to, $subject, $contentHtml, $attachments = array())
 {
     // a line break in a header would let someone add their own headers, so remove them
     $to = str_replace(array("\r", "\n"), '', (string)$to);
@@ -15,33 +20,60 @@ function send_mail($to, $subject, $contentHtml)
 
     $body = email_layout($subject, $contentHtml);
 
-    if (MAIL_DRIVER === 'mail') {
-        $headers = "MIME-Version: 1.0\r\n"
-            . "Content-Type: text/html; charset=UTF-8\r\n"
-            . "From: =?UTF-8?B?" . base64_encode(MAIL_FROM_NAME) . "?= <" . MAIL_FROM . ">\r\n";
-        $ok = @mail($to, '=?UTF-8?B?' . base64_encode($subject) . '?=', $body, $headers);
-        if (!$ok) {
-            error_log("send_mail: could not send '{$subject}' to {$to}");
+    // 'smtp': send through Mailtrap (or another SMTP server)
+    if (MAIL_DRIVER === 'smtp' && SMTP_USERNAME !== '') {
+        try {
+            smtp_send($to, mime_message($to, $subject, $body, $attachments));
+            return true;
+        } catch (RuntimeException $e) {
+            error_log("send_mail: could not send '{$subject}' to {$to}: " . $e->getMessage());
+            // keep a copy so the email is not lost, then report the failure
+            save_mail_copy($to, $subject, $body, $attachments, 'NOT SENT: ' . $e->getMessage());
+            return false;
         }
-        return $ok;
     }
 
-    // 'log': save the email as a web page you can open, instead of sending it
+    // 'log' (or 'smtp' without a Mailtrap login): save the email instead of sending it
+    $why = MAIL_DRIVER === 'smtp' ? 'no SMTP username in includes/mail_config.php' : "MAIL_DRIVER is 'log'";
+    return save_mail_copy($to, $subject, $body, $attachments, "Saved, not sent ({$why})");
+}
+
+// save an email as a web page in storage/mail/, with its attachments next to it
+function save_mail_copy($to, $subject, $body, $attachments, $reason)
+{
     $dir = __DIR__ . '/../storage/mail';
     if (!is_dir($dir) && !@mkdir($dir, 0775, true)) {
         error_log("send_mail: cannot create {$dir}");
         return false;
     }
+    $base = date('Ymd-His') . '-' . bin2hex(random_bytes(3));
+
+    $files = array();
+    foreach ($attachments as $file) {
+        $name = $base . '-' . preg_replace('/[^A-Za-z0-9._-]/', '_', $file['name']);
+        if (file_put_contents($dir . '/' . $name, $file['data']) !== false) {
+            $files[] = $name;
+        }
+    }
+
     $banner = "<div style=\"font-family:Arial,sans-serif;font-size:13px;background:#FFF3CD;border:1px solid #E0C97A;padding:10px;margin-bottom:16px;\">"
-        . "<strong>Saved, not sent</strong> (MAIL_DRIVER is 'log')<br>"
+        . "<strong>" . e($reason) . "</strong><br>"
         . "<strong>To:</strong> " . e($to) . "<br>"
         . "<strong>Subject:</strong> " . e($subject) . "<br>"
-        . "<strong>Date:</strong> " . date('M j, Y, g:i:s a') . "</div>";
-    $file = $dir . '/' . date('Ymd-His') . '-' . bin2hex(random_bytes(3)) . '.html';
+        . "<strong>Date:</strong> " . date('M j, Y, g:i:s a');
+    if ($files) {
+        $links = array();
+        foreach ($files as $name) {
+            $links[] = "<a href=\"" . e($name) . "\">" . e($name) . "</a>";
+        }
+        $banner .= "<br><strong>Attachments:</strong> " . implode(', ', $links);
+    }
+    $banner .= "</div>";
+
     $page = "<!doctype html><html><head><meta charset=\"utf-8\"><title>" . e($subject) . "</title></head>"
         . "<body style=\"background:#F4F4F4;padding:20px;\">{$banner}{$body}</body></html>";
 
-    return file_put_contents($file, $page) !== false;
+    return file_put_contents($dir . '/' . $base . '.html', $page) !== false;
 }
 
 // the frame around every email: store name on top, a small footer below
@@ -63,39 +95,44 @@ function email_button($url, $label)
     return "<p style=\"margin:20px 0;\"><a href=\"" . e($url) . "\" style=\"background:#8B1E3F;color:#FFFFFF;padding:10px 18px;text-decoration:none;border-radius:4px;display:inline-block;\">" . e($label) . "</a></p>";
 }
 
-// the list of items in an order, as an email-friendly table
-function email_order_table($conn, $order_id, $total)
+// the list of products in an order with their subtotals and the grand total, as an email-friendly table
+// (read from the order_details_view and order_summary_view views)
+function email_order_table($conn, $order_id)
 {
-    $sql = "SELECT oi.quantity, oi.price, p.name, p.brand
-            FROM order_items oi INNER JOIN product p USING (product_id)
-            WHERE oi.order_id = ?";
+    $sql = "SELECT product_name, brand, quantity, price, subtotal FROM order_details_view WHERE order_id = ? ORDER BY order_item_id";
     $items = mysqli_fetch_all(mysqli_execute_query($conn, $sql, [$order_id]), MYSQLI_ASSOC);
+    $sql = "SELECT grand_total FROM order_summary_view WHERE order_id = ? LIMIT 1";
+    $summary = mysqli_fetch_assoc(mysqli_execute_query($conn, $sql, [$order_id]));
+    $grandTotal = $summary ? $summary['grand_total'] : 0;
 
     $cell = "padding:6px 8px;border-bottom:1px solid #EAEAEA;";
     $rows = '';
     foreach ($items as $item) {
-        $rows .= "<tr><td style=\"{$cell}\">" . e($item['name']) . "<br><small style=\"color:#888888;\">" . e($item['brand']) . "</small></td>"
+        $rows .= "<tr><td style=\"{$cell}\">" . e($item['product_name']) . "<br><small style=\"color:#888888;\">" . e($item['brand']) . "</small></td>"
+            . "<td style=\"{$cell}text-align:right;\">" . peso($item['price']) . "</td>"
             . "<td style=\"{$cell}text-align:center;\">" . (int)$item['quantity'] . "</td>"
-            . "<td style=\"{$cell}text-align:right;\">" . peso($item['price'] * $item['quantity']) . "</td></tr>";
+            . "<td style=\"{$cell}text-align:right;\">" . peso($item['subtotal']) . "</td></tr>";
     }
     return "<table style=\"width:100%;border-collapse:collapse;font-size:14px;\">"
-        . "<tr><th style=\"{$cell}text-align:left;\">Item</th><th style=\"{$cell}\">Qty</th><th style=\"{$cell}text-align:right;\">Subtotal</th></tr>"
+        . "<tr style=\"background:#F5F5F5;\"><th style=\"{$cell}text-align:left;\">Product</th><th style=\"{$cell}text-align:right;\">Price</th>"
+        . "<th style=\"{$cell}\">Qty</th><th style=\"{$cell}text-align:right;\">Subtotal</th></tr>"
         . $rows
-        . "<tr><th colspan=\"2\" style=\"padding:8px;text-align:right;\">Total</th><th style=\"padding:8px;text-align:right;\">" . peso($total) . "</th></tr>"
+        . "<tr><th colspan=\"3\" style=\"padding:8px;text-align:right;\">Grand Total</th>"
+        . "<th style=\"padding:8px;text-align:right;color:#8B1E3F;\">" . peso($grandTotal) . "</th></tr>"
         . "</table>";
 }
 
 // fetch what every order email needs: the order and who it belongs to
 function email_order_info($conn, $order_id)
 {
-    $sql = "SELECT o.order_id, o.status, o.total_amount, o.payment_method, o.payment_status, o.shipping_address,
-                   u.name, u.email
-            FROM orders o INNER JOIN users u USING (user_id)
-            WHERE o.order_id = ? LIMIT 1";
+    $sql = "SELECT order_id, status, grand_total, payment_method, payment_status, shipping_address,
+                   customer_name AS name, customer_email AS email
+            FROM order_summary_view
+            WHERE order_id = ? LIMIT 1";
     return mysqli_fetch_assoc(mysqli_execute_query($conn, $sql, [$order_id]));
 }
 
-// "we received your order"
+// "we received your order", with the receipt attached
 function notify_order_placed($conn, $order_id)
 {
     $order = email_order_info($conn, $order_id);
@@ -104,21 +141,22 @@ function notify_order_placed($conn, $order_id)
     }
     $link = APP_URL . "/cart/order_confirmation.php?id=" . (int)$order_id;
     $due = $order['payment_method'] === 'cod'
-        ? "Please prepare <strong>" . peso($order['total_amount']) . "</strong> in cash for when your order arrives."
+        ? "Please prepare <strong>" . peso($order['grand_total']) . "</strong> in cash for when your order arrives."
         : "Payment: " . e(payment_label($order['payment_method'])) . ".";
 
     $html = "<p>Hi " . e($order['name']) . ",</p>"
         . "<p>Thank you for your order! We have received order <strong>#" . (int)$order_id . "</strong> and will start preparing it soon.</p>"
-        . email_order_table($conn, $order_id, $order['total_amount'])
+        . email_order_table($conn, $order_id)
         . "<p><strong>Payment:</strong> " . e(payment_label($order['payment_method'])) . "<br>{$due}</p>"
         . "<p><strong>Deliver to:</strong><br>" . e($order['shipping_address']) . "</p>"
-        . "<p>You can cancel this order while it is still pending.</p>"
+        . "<p>You can cancel this order while it is still pending. Your receipt is attached as a PDF.</p>"
         . email_button($link, 'View your order');
 
-    return send_mail($order['email'], "Order #" . (int)$order_id . " received", $html);
+    return send_mail($order['email'], "Order #" . (int)$order_id . " received", $html, order_receipt_attachment($conn, $order_id));
 }
 
-// "your order is now processing / shipped / completed / cancelled"
+// "your order is now processing / shipped / completed / cancelled":
+// the new status, the products with their subtotals and the grand total, and the PDF receipt
 function notify_order_status($conn, $order_id)
 {
     $order = email_order_info($conn, $order_id);
@@ -135,7 +173,7 @@ function notify_order_status($conn, $order_id)
     $messages = array(
         'processing' => array("Your order #{$id} is being prepared", "Good news: we are now preparing your order."),
         'shipped'    => array("Your order #{$id} is on its way", "Your order has been shipped and is on its way to you."),
-        'completed'  => array("Order #{$id} completed", "Your order has been delivered. Thank you for shopping with us!"),
+        'completed'  => array("Order #{$id} completed", "Your order has been delivered. Thank you for shopping with us! You can now review the products you bought."),
         'cancelled'  => array("Order #{$id} was cancelled", "Your order has been cancelled. Nothing will be delivered or charged."),
     );
     if (!isset($messages[$order['status']])) {
@@ -149,11 +187,14 @@ function notify_order_status($conn, $order_id)
         $html .= "<p><strong>Note from the store:</strong> " . e($note) . "</p>";
     }
     if ($order['status'] === 'completed' && $order['payment_status'] === 'paid') {
-        $html .= "<p>Payment of " . peso($order['total_amount']) . " received.</p>";
+        $html .= "<p>Payment of " . peso($order['grand_total']) . " received.</p>";
     }
-    $html .= email_button(APP_URL . "/cart/order_confirmation.php?id={$id}", 'View your order');
+    $html .= "<h3 style=\"font-family:'Trebuchet MS',Arial,sans-serif;font-size:16px;margin:18px 0 8px;\">Your order</h3>"
+        . email_order_table($conn, $order_id)
+        . "<p>The receipt for this transaction is attached as a PDF.</p>"
+        . email_button(APP_URL . "/cart/order_confirmation.php?id={$id}", 'View your order');
 
-    return send_mail($order['email'], $subject, $html);
+    return send_mail($order['email'], $subject, $html, order_receipt_attachment($conn, $order_id));
 }
 
 function send_password_reset_email($email, $name, $link)

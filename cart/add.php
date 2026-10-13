@@ -3,19 +3,8 @@ session_start();
 include('../includes/config.php');
 include('../includes/functions.php');
 
-// 1. must be logged in
-if (!isset($_SESSION['user_id'])) {
-    $_SESSION['message'] = 'please log in to add items to your cart';
-    header("Location: ../user/login.php");
-    exit();
-}
-
-// 2. admins manage the store, only customers shop
-if ($_SESSION['role'] !== 'customer') {
-    $_SESSION['message'] = 'only customers can use the cart';
-    header("Location: ../index.php");
-    exit();
-}
+// 1. must be logged in, and 2. admins manage the store, only customers shop
+require_customer();
 
 // 3. only accept the form, not someone typing the URL
 if (!isset($_POST['submit'])) {

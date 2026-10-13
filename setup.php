@@ -93,24 +93,24 @@ include('./includes/header.php');
     <?php else: ?>
         <p class="text-muted">There is no admin account yet. Create one now. You will use it to manage products, orders and the dashboard.
             This page stops working once an admin exists.</p>
-        <form action="setup.php" method="POST">
+        <form action="setup.php" method="POST" novalidate>
             <?= csrf_field() ?>
             <div class="mb-3">
                 <label class="form-label" for="name">Your name</label>
-                <input type="text" id="name" class="form-control" name="name" value="<?= e($name) ?>" required autofocus>
+                <input type="text" id="name" class="form-control" name="name" value="<?= e($name) ?>" autofocus>
             </div>
             <div class="mb-3">
                 <label class="form-label" for="email">Admin email</label>
-                <input type="email" id="email" class="form-control" name="email" value="<?= e($email) ?>" required>
+                <input type="text" id="email" class="form-control" name="email" value="<?= e($email) ?>">
             </div>
             <div class="mb-3">
                 <label class="form-label" for="password">Password</label>
-                <input type="password" id="password" class="form-control" name="password" minlength="8" required>
+                <input type="password" id="password" class="form-control" name="password">
                 <div class="form-text">At least 8 characters.</div>
             </div>
             <div class="mb-3">
                 <label class="form-label" for="confirmPass">Confirm password</label>
-                <input type="password" id="confirmPass" class="form-control" name="confirmPass" minlength="8" required>
+                <input type="password" id="confirmPass" class="form-control" name="confirmPass">
             </div>
             <button type="submit" class="btn btn-primary mb-4">Create admin account</button>
         </form>

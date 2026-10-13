@@ -4,11 +4,7 @@ include('../includes/config.php');
 include('../includes/functions.php');
 
 // change the quantity of one item in the customer's own cart
-if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'customer') {
-    $_SESSION['message'] = 'please log in with a customer account';
-    header("Location: ../user/login.php");
-    exit();
-}
+require_customer();
 
 if (!isset($_POST['submit'])) {
     header("Location: index.php");

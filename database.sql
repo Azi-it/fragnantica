@@ -1,8 +1,10 @@
 -- Online Fragrance & Scent Products Store
--- Database: users, customer, category, product, stock, cart, orders, order_items, order_status_history, password_resets
+-- Database: users, customer, category, product, product_images, stock, cart, orders, order_items,
+--           order_status_history, password_resets, review
+-- Views:    order_details_view, order_totals_view, order_summary_view (order transaction details)
 --
 -- Already have the database from an older version and want to keep its data?
--- Run the files in migrations/ in order (001, then 002) instead of this file.
+-- Run the files in migrations/ in order (001, 002, then 003) instead of this file.
 --
 -- How to import: open phpMyAdmin > Import > choose this file > Go
 -- WARNING: importing this file again deletes all data in these tables.
@@ -16,6 +18,12 @@ SET NAMES utf8mb4;
 CREATE DATABASE IF NOT EXISTS fragrance_store;
 USE fragrance_store;
 
+DROP VIEW IF EXISTS order_summary_view;
+DROP VIEW IF EXISTS order_totals_view;
+DROP VIEW IF EXISTS order_details_view;
+
+DROP TABLE IF EXISTS review;
+DROP TABLE IF EXISTS product_images;
 DROP TABLE IF EXISTS password_resets;
 DROP TABLE IF EXISTS order_status_history;
 DROP TABLE IF EXISTS order_items;
@@ -28,12 +36,16 @@ DROP TABLE IF EXISTS customer;
 DROP TABLE IF EXISTS users;
 
 -- customers and admins
+-- img_path: profile photo (user/images/...), NULL = no photo
+-- status: an admin deactivates an account instead of deleting it, so its orders are kept
 CREATE TABLE users (
     user_id INT PRIMARY KEY NOT NULL AUTO_INCREMENT,
     name VARCHAR(100) NOT NULL,
     email VARCHAR(100) NOT NULL UNIQUE,
     password VARCHAR(255) NOT NULL,
+    img_path VARCHAR(255) NULL,
     role ENUM('customer', 'admin') NOT NULL DEFAULT 'customer',
+    status ENUM('active', 'inactive') NOT NULL DEFAULT 'active',
     created_at DATETIME NOT NULL
 );
 
@@ -69,6 +81,15 @@ CREATE TABLE product (
     sell_price DECIMAL(10,2) NOT NULL,
     img_path VARCHAR(255) NOT NULL,
     FOREIGN KEY (category_id) REFERENCES category (category_id)
+);
+
+-- extra photos of a product (the main photo is product.img_path)
+CREATE TABLE product_images (
+    image_id INT PRIMARY KEY NOT NULL AUTO_INCREMENT,
+    product_id INT NOT NULL,
+    img_path VARCHAR(255) NOT NULL,
+    uploaded_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (product_id) REFERENCES product (product_id) ON DELETE CASCADE
 );
 
 -- how many pieces of each product are available
@@ -141,6 +162,56 @@ CREATE TABLE password_resets (
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users (user_id) ON DELETE CASCADE
 );
+
+-- product reviews: one review per customer per product.
+-- only a customer with a completed order of the product may write one
+CREATE TABLE review (
+    review_id INT PRIMARY KEY NOT NULL AUTO_INCREMENT,
+    product_id INT NOT NULL,
+    user_id INT NOT NULL,
+    rating TINYINT NOT NULL,
+    comment VARCHAR(1000) NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NULL,
+    UNIQUE (product_id, user_id),
+    CHECK (rating BETWEEN 1 AND 5),
+    FOREIGN KEY (product_id) REFERENCES product (product_id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users (user_id)
+);
+
+-- ---------------------------------------------------------------
+-- views for the order transaction details
+-- ---------------------------------------------------------------
+
+-- one row per product in an order, with its subtotal
+CREATE VIEW order_details_view AS
+SELECT oi.order_item_id, oi.order_id, o.user_id, o.status, o.created_at AS order_date,
+       oi.product_id, p.name AS product_name, p.brand, p.size, p.unit, p.img_path,
+       oi.quantity, oi.price, oi.quantity * oi.price AS subtotal
+FROM order_items oi
+INNER JOIN orders o USING (order_id)
+INNER JOIN product p USING (product_id);
+
+-- the number of items and the grand total of each order
+CREATE VIEW order_totals_view AS
+SELECT order_id,
+       COUNT(*) AS item_count,
+       SUM(quantity) AS total_units,
+       SUM(quantity * price) AS grand_total
+FROM order_items
+GROUP BY order_id;
+
+-- one row per order: the order, its customer and its totals
+CREATE VIEW order_summary_view AS
+SELECT o.order_id, o.user_id, u.name AS customer_name, u.email AS customer_email,
+       o.status, o.shipping_address, o.payment_method, o.payment_status, o.paid_at,
+       o.created_at, o.updated_at,
+       COALESCE(t.item_count, 0) AS item_count,
+       COALESCE(t.total_units, 0) AS total_units,
+       COALESCE(t.grand_total, 0) AS grand_total
+FROM orders o
+INNER JOIN users u USING (user_id)
+LEFT JOIN order_totals_view t USING (order_id);
 
 -- the storefront filters and sorts by these
 CREATE INDEX idx_product_brand ON product (brand);

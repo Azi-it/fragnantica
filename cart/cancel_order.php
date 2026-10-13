@@ -4,11 +4,7 @@ include('../includes/config.php');
 include('../includes/functions.php');
 
 // customers can cancel their own order while it is still pending
-if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'customer') {
-    $_SESSION['message'] = 'please log in with a customer account';
-    header("Location: ../user/login.php");
-    exit();
-}
+require_customer();
 
 // only accept the form (POST), never a link
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
