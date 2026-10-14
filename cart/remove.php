@@ -3,7 +3,11 @@ session_start();
 include('../includes/config.php');
 include('../includes/functions.php');
 
-require_customer();
+if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'customer') {
+    $_SESSION['message'] = 'please log in with a customer account';
+    header("Location: ../user/login.php");
+    exit();
+}
 
 if (isset($_POST['submit'])) {
     if (!csrf_valid()) {

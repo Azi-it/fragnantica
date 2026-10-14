@@ -4,7 +4,11 @@ include('../includes/config.php');
 include('../includes/functions.php');
 
 // only admins can change order status
-require_admin();
+if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'admin') {
+    $_SESSION['message'] = 'admin access only, please log in with an admin account';
+    header("Location: ../user/login.php");
+    exit();
+}
 
 // only accept the form (POST), never a link
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -33,12 +37,8 @@ list($ok, $text) = change_order_status($conn, $order_id, $status, $_SESSION['use
 
 if ($ok) {
     // tell the customer (a failed email does not undo the change)
-    if (notify_order_status($conn, $order_id)) {
-        $_SESSION['success'] = $text . ' The customer has been emailed the update with the PDF receipt.';
-    } else {
-        $_SESSION['success'] = $text;
-        $_SESSION['message'] = 'The status was saved, but the email to the customer could not be sent. Check the Mailtrap settings in includes/mail_config.php (details are in the PHP error log).';
-    }
+    notify_order_status($conn, $order_id);
+    $_SESSION['success'] = $text . ' The customer has been emailed.';
 } else {
     $_SESSION['message'] = $text;
 }

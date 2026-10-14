@@ -4,7 +4,11 @@ include('../includes/config.php');
 include('../includes/functions.php');
 
 // only admins can manage orders
-require_admin();
+if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'admin') {
+    $_SESSION['message'] = 'admin access only, please log in with an admin account';
+    header("Location: ../user/login.php");
+    exit();
+}
 
 $statuses = order_statuses();
 $perPage = 20;
@@ -39,13 +43,13 @@ if ($keyword !== '') {
         $where .= " AND o.order_id = ?";
         $params[] = (int)$number;
     } else {
-        $where .= " AND (o.customer_name LIKE ? OR o.customer_email LIKE ?)";
+        $where .= " AND (u.name LIKE ? OR u.email LIKE ?)";
         $params[] = "%{$keyword}%";
         $params[] = "%{$keyword}%";
     }
 }
 
-$countSql = "SELECT COUNT(*) AS total FROM order_summary_view o" . $where;
+$countSql = "SELECT COUNT(*) AS total FROM orders o INNER JOIN users u USING (user_id)" . $where;
 $total = (int)mysqli_fetch_assoc(mysqli_execute_query($conn, $countSql, $params))['total'];
 $totalPages = max(1, (int)ceil($total / $perPage));
 if ($page > $totalPages) {
@@ -53,10 +57,11 @@ if ($page > $totalPages) {
 }
 $offset = ($page - 1) * $perPage;
 
-// every order with its customer and totals, from the order_summary_view view
-$sql = "SELECT o.order_id, o.grand_total, o.status, o.payment_method, o.payment_status, o.created_at,
-               o.customer_name, o.customer_email, o.total_units AS units
-        FROM order_summary_view o" . $where . "
+$sql = "SELECT o.order_id, o.total_amount, o.status, o.payment_method, o.payment_status, o.created_at,
+               u.name AS customer_name, u.email AS customer_email,
+               (SELECT COALESCE(SUM(oi.quantity), 0) FROM order_items oi WHERE oi.order_id = o.order_id) AS units
+        FROM orders o
+        INNER JOIN users u USING (user_id)" . $where . "
         ORDER BY o.created_at DESC, o.order_id DESC
         LIMIT {$perPage} OFFSET {$offset}";
 $orders = mysqli_fetch_all(mysqli_execute_query($conn, $sql, $params), MYSQLI_ASSOC);
@@ -118,7 +123,7 @@ include('../includes/header.php');
                         <td><?= date('M j, Y, g:i a', strtotime($order['created_at'])) ?></td>
                         <td><?= e($order['customer_name']) ?><br><small class="text-muted"><?= e($order['customer_email']) ?></small></td>
                         <td><?= (int)$order['units'] ?></td>
-                        <td><?= peso($order['grand_total']) ?></td>
+                        <td><?= peso($order['total_amount']) ?></td>
                         <td><small><?= e(payment_label($order['payment_method'])) ?></small><br><?= payment_badge($order['payment_status']) ?></td>
                         <td><?= status_badge($order['status']) ?></td>
                         <td><a href="view.php?id=<?= (int)$order['order_id'] ?>" class="btn btn-sm btn-outline-primary">Manage</a></td>

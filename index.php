@@ -51,12 +51,12 @@ if ($categoryId) {
     $where .= " AND p.category_id = ?";
     $params[] = $categoryId;
 }
-// search: the keyword may appear in the name, brand, category, scent type or description
 if ($keyword !== '') {
-    $where .= " AND (p.name LIKE ? OR p.brand LIKE ? OR c.name LIKE ? OR p.scent_type LIKE ? OR p.description LIKE ?)";
-    for ($i = 0; $i < 5; $i++) {
-        $params[] = "%{$keyword}%";
-    }
+    $where .= " AND (p.name LIKE ? OR p.brand LIKE ? OR c.name LIKE ? OR p.scent_type LIKE ?)";
+    $params[] = "%{$keyword}%";
+    $params[] = "%{$keyword}%";
+    $params[] = "%{$keyword}%";
+    $params[] = "%{$keyword}%";
 }
 if ($brand !== '') {
     $where .= " AND p.brand = ?";
@@ -92,9 +92,7 @@ if ($page > $totalPages) {
 $offset = ($page - 1) * $perPage;
 
 $sql = "SELECT p.product_id, p.name, p.brand, p.scent_type, p.size, p.unit, p.description, p.sell_price, p.img_path,
-               c.name AS category, s.quantity AS stock,
-               (SELECT AVG(r.rating) FROM review r WHERE r.product_id = p.product_id) AS avg_rating,
-               (SELECT COUNT(*) FROM review r WHERE r.product_id = p.product_id) AS review_count"
+               c.name AS category, s.quantity AS stock"
      . $from . $where
      . " ORDER BY " . $sorts[$sort]['sql']
      . " LIMIT {$perPage} OFFSET {$offset}";
@@ -118,17 +116,6 @@ include('./includes/header.php');
 </div>
 <h1 align="center">Fragrance &amp; Scent Products</h1>
 
-<!-- search: finds products by name, brand, category, scent type or description -->
-<form class="home-search mx-3 mx-lg-auto mb-3" method="GET" action="index.php" role="search">
-    <?php if ($categoryId): ?><input type="hidden" name="category" value="<?= (int)$categoryId ?>"><?php endif; ?>
-    <div class="input-group input-group-lg">
-        <span class="input-group-text bg-white"><i class="fa-solid fa-magnifying-glass"></i></span>
-        <input class="form-control" type="search" name="search" value="<?= e($keyword) ?>"
-            placeholder="Search perfumes, candles, brands, scents..." aria-label="Search products">
-        <button class="btn btn-primary" type="submit">Search</button>
-    </div>
-</form>
-
 <div class="text-center mb-3 px-3">
     <a href="<?= e(url_with(array('category' => null, 'page' => null), $keep)) ?>"
         class="btn btn-sm <?= $categoryId ? 'btn-outline-secondary' : 'btn-secondary' ?> m-1">All</a>
@@ -138,7 +125,7 @@ include('./includes/header.php');
     <?php endforeach; ?>
 </div>
 
-<form class="filter-bar card card-body mb-3 mx-3 mx-lg-auto" method="GET" action="index.php" novalidate>
+<form class="filter-bar card card-body mb-3 mx-3 mx-lg-auto" method="GET" action="index.php">
     <?php if ($keyword !== ''): ?><input type="hidden" name="search" value="<?= e($keyword) ?>"><?php endif; ?>
     <?php if ($categoryId): ?><input type="hidden" name="category" value="<?= (int)$categoryId ?>"><?php endif; ?>
     <div class="row g-2 align-items-end">
@@ -219,7 +206,7 @@ if ($productCount > 0) {
         } else if ($stock <= 0) {
             $cartForm = "<button class='btn btn-secondary btn-sm w-100 mt-2' disabled>Out of stock</button>";
         } else {
-            $cartForm = "<form action='./cart/add.php' method='POST' class='d-flex gap-1 mt-2' novalidate>
+            $cartForm = "<form action='./cart/add.php' method='POST' class='d-flex gap-1 mt-2'>
                 " . csrf_field() . "
                 <input type='hidden' name='product_id' value='{$id}'>
                 <input type='hidden' name='return_query' value='" . e($returnQuery) . "'>
@@ -238,10 +225,6 @@ if ($productCount > 0) {
         $unit = e($row['unit']);
         $desc = e($row['description']);
         $price = peso($row['sell_price']);
-        $reviews = (int)$row['review_count'];
-        $rating = $reviews > 0
-            ? "<p class='mb-1'>" . stars($row['avg_rating']) . " <small class='text-muted'>({$reviews})</small></p>"
-            : "<p class='mb-1 small text-muted'>No reviews yet</p>";
 
         echo <<<EOT
     <li class="product">
@@ -253,7 +236,6 @@ if ($productCount > 0) {
                 <p class="brand">{$brandName}</p>
                 <p>{$scentType} &middot; {$size} {$unit}</p>
                 <div class="product-desc">{$desc}</div>
-                {$rating}
                 <p class="price">{$price}</p>
             </div>
             {$cartForm}

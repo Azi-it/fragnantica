@@ -58,11 +58,11 @@ include("../includes/header.php");
     <h2>Forgot your password?</h2>
     <?php include("../includes/alert.php"); ?>
     <p class="text-muted">Enter the email you registered with and we will send you a link to choose a new password.</p>
-    <form action="forgot_password.php" method="POST" novalidate>
+    <form action="forgot_password.php" method="POST">
         <?= csrf_field() ?>
         <div class="mb-3">
             <label class="form-label" for="email">Email address</label>
-            <input type="text" id="email" class="form-control" name="email" autofocus />
+            <input type="email" id="email" class="form-control" name="email" required autofocus />
         </div>
         <button type="submit" class="btn btn-primary mb-4">Send reset link</button>
         <div class="text-center">

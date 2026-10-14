@@ -3,15 +3,23 @@ session_start();
 include('../includes/config.php');
 include('../includes/functions.php');
 
-require_customer();
+if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'customer') {
+    $_SESSION['message'] = 'please log in with a customer account';
+    header("Location: ../user/login.php");
+    exit();
+}
 
 $user_id = $_SESSION['user_id'];
 
-// all orders of this customer with their item count and grand total (order_summary_view view)
-$sql = "SELECT order_id, grand_total, status, payment_method, payment_status, created_at, item_count, total_units
-        FROM order_summary_view
-        WHERE user_id = ?
-        ORDER BY created_at DESC, order_id DESC";
+// Fetch all orders for this customer with item count
+$sql = "SELECT o.order_id, o.total_amount, o.status, o.payment_method, o.payment_status, o.created_at,
+               COUNT(oi.order_item_id) AS item_count,
+               SUM(oi.quantity) AS total_units
+        FROM orders o
+        LEFT JOIN order_items oi USING (order_id)
+        WHERE o.user_id = ?
+        GROUP BY o.order_id
+        ORDER BY o.created_at DESC, o.order_id DESC";
 $result = mysqli_execute_query($conn, $sql, [$user_id]);
 $orders = mysqli_fetch_all($result, MYSQLI_ASSOC);
 
@@ -43,7 +51,7 @@ include('../includes/header.php');
                         <td><strong>#<?= (int)$order['order_id'] ?></strong></td>
                         <td><?= date('M j, Y, g:i a', strtotime($order['created_at'])) ?></td>
                         <td><?= (int)($order['total_units'] ?? 0) ?> units (<?= (int)$order['item_count'] ?> products)</td>
-                        <td><strong><?= peso($order['grand_total']) ?></strong></td>
+                        <td><strong><?= peso($order['total_amount']) ?></strong></td>
                         <td><small><?= e(payment_label($order['payment_method'])) ?></small><br><?= payment_badge($order['payment_status']) ?></td>
                         <td><?= status_badge($order['status']) ?></td>
                         <td>

@@ -83,17 +83,17 @@ include("../includes/header.php");
         <p><a href="forgot_password.php" class="btn btn-primary">Send me a new link</a></p>
     <?php else: ?>
         <p class="text-muted">Setting a new password for <strong><?= e($reset['email']) ?></strong>.</p>
-        <form action="reset_password.php" method="POST" novalidate>
+        <form action="reset_password.php" method="POST">
             <?= csrf_field() ?>
             <input type="hidden" name="token" value="<?= e($token) ?>">
             <div class="mb-3">
                 <label class="form-label" for="password">New password</label>
-                <input type="password" id="password" class="form-control" name="password" autofocus />
+                <input type="password" id="password" class="form-control" name="password" minlength="6" required autofocus />
                 <div class="form-text">At least 6 characters.</div>
             </div>
             <div class="mb-3">
                 <label class="form-label" for="confirmPass">Confirm new password</label>
-                <input type="password" id="confirmPass" class="form-control" name="confirmPass" />
+                <input type="password" id="confirmPass" class="form-control" name="confirmPass" minlength="6" required />
             </div>
             <button type="submit" class="btn btn-primary mb-4">Change password</button>
         </form>

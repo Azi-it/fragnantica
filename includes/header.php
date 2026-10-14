@@ -37,7 +37,6 @@
                         echo '<li class="nav-item"><a class="nav-link" href="/Fragnantica/product/index.php">Products</a></li>';
                         echo '<li class="nav-item"><a class="nav-link" href="/Fragnantica/product/create.php">Add Product</a></li>';
                         echo '<li class="nav-item"><a class="nav-link" href="/Fragnantica/order/index.php"><i class="fa-solid fa-receipt"></i> Orders</a></li>';
-                        echo '<li class="nav-item"><a class="nav-link" href="/Fragnantica/admin/users/index.php"><i class="fa-solid fa-users"></i> Users</a></li>';
                     }
 
                     // links for any logged in user
@@ -53,7 +52,7 @@
                 </ul>
                 <form action="/Fragnantica/index.php" method="GET" class="d-flex" role="search">
                     <input class="form-control me-2" type="search" placeholder="Search products" aria-label="Search"
-                        name="search" value="<?php if (isset($_GET['search']) && is_string($_GET['search'])) echo htmlspecialchars($_GET['search'], ENT_QUOTES, 'UTF-8'); ?>">
+                        name="search" value="<?php if (isset($_GET['search'])) echo htmlentities($_GET['search']); ?>">
                     <button class="btn btn-outline-success" type="submit">Search</button>
                 </form>
                 <?php
@@ -62,10 +61,8 @@
                         <a href='/Fragnantica/user/login.php' class='nav-item nav-link'>Login</a>
                         <a href='/Fragnantica/user/register.php' class='nav-item nav-link'>Register</a></div>";
                 } else {
-                    $navName = htmlspecialchars($_SESSION['name'], ENT_QUOTES, 'UTF-8');
-                    $navPhoto = function_exists('avatar') ? avatar($_SESSION['name'], $_SESSION['photo'] ?? null, 28) : "<i class='fa-solid fa-user'></i>";
-                    echo "<div class='navbar-nav ms-auto align-items-lg-center'>
-                        <a href='/Fragnantica/user/profile.php' class='nav-item nav-link d-flex align-items-center gap-2'>{$navPhoto} {$navName}</a>
+                    echo "<div class='navbar-nav ms-auto'>
+                        <span class='nav-item nav-link'><i class='fa-solid fa-user'></i> " . htmlspecialchars($_SESSION['name'], ENT_QUOTES, 'UTF-8') . "</span>
                         <a href='/Fragnantica/user/logout.php' class='nav-item nav-link'>Logout</a></div>";
                 }
                 ?>
