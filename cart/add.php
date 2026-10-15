@@ -35,7 +35,7 @@ if (($_POST['return'] ?? '') === 'product' && $product_id) {
     $back = '../product/view.php?id=' . (int)$product_id;
 } else if (isset($_POST['return_query']) && is_string($_POST['return_query'])) {
     parse_str($_POST['return_query'], $query);
-    $allowed = array('search', 'category', 'brand', 'scent', 'min_price', 'max_price', 'in_stock', 'sort', 'page');
+    $allowed = array('search', 'brand', 'scent', 'min_price', 'max_price', 'in_stock', 'sort', 'page');
     $query = array_filter(array_intersect_key($query, array_flip($allowed)), 'is_string');
     if ($query) {
         $back .= '?' . http_build_query($query);

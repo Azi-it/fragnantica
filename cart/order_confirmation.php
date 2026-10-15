@@ -13,7 +13,7 @@ $user_id = $_SESSION['user_id'];
 $order_id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
 
 if (!$order_id) {
-    header("Location: orders.php");
+    header("Location: ../index.php");
     exit();
 }
 
@@ -27,7 +27,7 @@ $order = mysqli_fetch_assoc($orderResult);
 
 if (!$order) {
     $_SESSION['message'] = 'Order not found.';
-    header("Location: orders.php");
+    header("Location: ../index.php");
     exit();
 }
 
@@ -134,7 +134,6 @@ include('../includes/header.php');
             <?php endif; ?>
 
             <div class="d-flex flex-wrap justify-content-between gap-2 mt-4">
-                <a href="orders.php" class="btn btn-secondary"><i class="fa-solid fa-box me-1"></i> All My Orders</a>
                 <?php if ($canCancel): ?>
                     <form action="cancel_order.php" method="POST" onsubmit="return confirm('Cancel order #<?= (int)$order['order_id'] ?>? This cannot be undone.');">
                         <?= csrf_field() ?>

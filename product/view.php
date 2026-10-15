@@ -51,7 +51,7 @@ include('../includes/header.php');
     <nav aria-label="breadcrumb">
         <ol class="breadcrumb">
             <li class="breadcrumb-item"><a href="../index.php">Home</a></li>
-            <li class="breadcrumb-item"><a href="../index.php?category=<?= (int)$product['category_id'] ?>"><?= e($product['category']) ?></a></li>
+            <li class="breadcrumb-item"><?= e($product['category']) ?></li>
             <li class="breadcrumb-item active" aria-current="page"><?= e($product['name']) ?></li>
         </ol>
     </nav>

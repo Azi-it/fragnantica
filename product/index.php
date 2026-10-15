@@ -54,8 +54,7 @@ $productCount = mysqli_num_rows($result);
                 echo "<td>{$row['cost_price']}</td>";
                 echo "<td>{$row['sell_price']}</td>";
                 echo "<td>{$row['quantity']}</td>";
-                echo "<td><a href='edit.php?id={$row['product_id']}' title='Edit'><i class='fa-regular fa-pen-to-square' style='color: blue'></i></a> ";
-                echo "<a href='delete.php?id={$row['product_id']}' title='Delete' onclick=\"return confirm('Delete this product?')\"><i class='fa-solid fa-trash' style='color: red'></i></a></td>";
+                echo "<td><a href='edit.php?id={$row['product_id']}' title='Edit'><i class='fa-regular fa-pen-to-square' style='color: blue'></i></a></td>";
                 echo "</tr>";
             }
             ?>

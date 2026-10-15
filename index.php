@@ -25,7 +25,6 @@ function get_price($key)
 }
 
 $keyword = get_text('search');
-$categoryId = filter_input(INPUT_GET, 'category', FILTER_VALIDATE_INT);
 $brand = get_text('brand');
 $scent = get_text('scent');
 $minPrice = get_price('min_price');
@@ -41,16 +40,12 @@ if (!$page) {
 }
 
 // the query parameters that links on this page carry forward
-$keep = array('search', 'category', 'brand', 'scent', 'min_price', 'max_price', 'in_stock', 'sort');
+$keep = array('search', 'brand', 'scent', 'min_price', 'max_price', 'in_stock', 'sort');
 
 // "WHERE 1=1" is always true, so each filter can simply add "AND ..."
 $where = " WHERE 1=1";
 $params = array();
 
-if ($categoryId) {
-    $where .= " AND p.category_id = ?";
-    $params[] = $categoryId;
-}
 if ($keyword !== '') {
     $where .= " AND (p.name LIKE ? OR p.brand LIKE ? OR c.name LIKE ? OR p.scent_type LIKE ?)";
     $params[] = "%{$keyword}%";
@@ -98,8 +93,7 @@ $sql = "SELECT p.product_id, p.name, p.brand, p.scent_type, p.size, p.unit, p.de
      . " LIMIT {$perPage} OFFSET {$offset}";
 $products = mysqli_fetch_all(mysqli_execute_query($conn, $sql, $params), MYSQLI_ASSOC);
 
-// choices for the filter dropdowns and the category buttons
-$categories = mysqli_fetch_all(mysqli_query($conn, "SELECT category_id, name FROM category ORDER BY category_id"), MYSQLI_ASSOC);
+// choices for the filter dropdowns
 $brands = mysqli_fetch_all(mysqli_query($conn, "SELECT DISTINCT brand FROM product ORDER BY brand"), MYSQLI_ASSOC);
 $scents = mysqli_fetch_all(mysqli_query($conn, "SELECT DISTINCT scent_type FROM product ORDER BY scent_type"), MYSQLI_ASSOC);
 
@@ -116,18 +110,8 @@ include('./includes/header.php');
 </div>
 <h1 align="center">Fragrance &amp; Scent Products</h1>
 
-<div class="text-center mb-3 px-3">
-    <a href="<?= e(url_with(array('category' => null, 'page' => null), $keep)) ?>"
-        class="btn btn-sm <?= $categoryId ? 'btn-outline-secondary' : 'btn-secondary' ?> m-1">All</a>
-    <?php foreach ($categories as $cat): ?>
-        <a href="<?= e(url_with(array('category' => $cat['category_id'], 'page' => null), $keep)) ?>"
-            class="btn btn-sm <?= $categoryId == $cat['category_id'] ? 'btn-secondary' : 'btn-outline-secondary' ?> m-1"><?= e($cat['name']) ?></a>
-    <?php endforeach; ?>
-</div>
-
 <form class="filter-bar card card-body mb-3 mx-3 mx-lg-auto" method="GET" action="index.php">
     <?php if ($keyword !== ''): ?><input type="hidden" name="search" value="<?= e($keyword) ?>"><?php endif; ?>
-    <?php if ($categoryId): ?><input type="hidden" name="category" value="<?= (int)$categoryId ?>"><?php endif; ?>
     <div class="row g-2 align-items-end">
         <div class="col-6 col-md-2">
             <label class="form-label small mb-1" for="f-brand">Brand</label>
@@ -173,7 +157,7 @@ include('./includes/header.php');
             <div class="d-flex gap-1">
                 <button class="btn btn-sm btn-dark flex-fill" type="submit">Apply</button>
                 <?php if ($filtersActive || $sort !== 'newest'): ?>
-                    <a class="btn btn-sm btn-outline-secondary" href="<?= e(url_with(array(), array('search', 'category'))) ?>" title="Clear filters">Clear</a>
+                    <a class="btn btn-sm btn-outline-secondary" href="<?= e(url_with(array(), array('search'))) ?>" title="Clear filters">Clear</a>
                 <?php endif; ?>
             </div>
         </div>
@@ -246,7 +230,7 @@ EOT;
 
     echo '</ul>';
     echo '<div class="mt-3">' . pagination($page, $totalPages, $keep) . '</div>';
-} else if ($keyword !== '' || $categoryId || $filtersActive) {
+} else if ($keyword !== '' || $filtersActive) {
     echo "<p align='center'>No products match these filters. <a href='index.php'>Show all products</a></p>";
 } else {
     echo "<p align='center'>No products available yet.</p>";

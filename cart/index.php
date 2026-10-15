@@ -46,7 +46,7 @@ include('../includes/header.php');
                 <thead>
                     <tr>
                         <th>Photo</th><th>Product</th><th>Price</th>
-                        <th style="min-width: 190px;">Qty</th><th>Subtotal</th><th></th>
+                        <th style="min-width: 190px;">Qty</th><th>Subtotal</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -77,20 +77,13 @@ include('../includes/header.php');
                             <?php endif; ?>
                         </td>
                         <td><?= peso($lineTotal) ?></td>
-                        <td>
-                            <form action="remove.php" method="POST">
-                                <?= csrf_field() ?>
-                                <input type="hidden" name="product_id" value="<?= $id ?>">
-                                <button type="submit" name="submit" class="btn btn-outline-danger btn-sm">Remove</button>
-                            </form>
-                        </td>
                     </tr>
                 <?php endforeach; ?>
                 </tbody>
                 <tfoot>
                     <tr>
                         <th colspan="4" class="text-end">Total</th>
-                        <th colspan="2"><?= peso($grandTotal) ?></th>
+                        <th><?= peso($grandTotal) ?></th>
                     </tr>
                 </tfoot>
             </table>

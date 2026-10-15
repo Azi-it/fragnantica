@@ -53,7 +53,7 @@ $units = array('ml', 'g', 'pcs');
 <div class="container mt-4">
     <h2>Edit Product</h2>
     <?php include('../includes/alert.php'); ?>
-    <form method="POST" action="update.php" enctype="multipart/form-data">
+    <form method="POST" action="update.php">
         <input type="hidden" name="product_id" value="<?php echo $product['product_id']; ?>" />
 
         <div class="row gx-3 mb-3">
@@ -204,15 +204,6 @@ $units = array('ml', 'g', 'pcs');
         <div class="mb-3">
             <label class="form-label">Current Photo</label><br />
             <img src="<?php echo $product['img_path']; ?>" width="120" height="120" class="product-photo border mb-2" />
-            <br />
-            <label for="photo" class="form-label">New Photo (JPG or PNG only, leave empty to keep the current photo)</label>
-            <input class="form-control" type="file" id="photo" name="img_path" accept=".jpg,.jpeg,.png" />
-            <small class="text-danger"><?php
-                    if (isset($_SESSION['imageError'])) {
-                        echo $_SESSION['imageError'];
-                        unset($_SESSION['imageError']);
-                    }
-                    ?></small>
         </div>
 
         <button type="submit" class="btn btn-primary" name="submit">Save Changes</button>

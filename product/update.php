@@ -66,20 +66,6 @@ if (isset($_POST['submit'])) {
         $hasErrors = true;
     }
 
-    // a new photo is optional, so only check it if one was chosen
-    $newPhoto = false;
-    if (isset($_FILES['img_path']) && $_FILES['img_path']['error'] !== UPLOAD_ERR_NO_FILE) {
-        if ($_FILES['img_path']['error'] !== UPLOAD_ERR_OK) {
-            $_SESSION['imageError'] = 'Photo upload failed, please try again';
-            $hasErrors = true;
-        } else if ($_FILES['img_path']['type'] != "image/jpeg" && $_FILES['img_path']['type'] != "image/jpg" && $_FILES['img_path']['type'] != "image/png") {
-            $_SESSION['imageError'] = 'Only JPG and PNG photos are accepted';
-            $hasErrors = true;
-        } else {
-            $newPhoto = true;
-        }
-    }
-
     if ($hasErrors) {
         // keep what the admin typed so the form can be filled again
         $_SESSION['productName'] = $name;
@@ -96,29 +82,13 @@ if (isset($_POST['submit'])) {
         exit();
     }
 
-    // get the current photo so it can be kept or replaced
-    $sql = "SELECT img_path FROM product WHERE product_id = ? LIMIT 1";
+    $sql = "SELECT product_id FROM product WHERE product_id = ? LIMIT 1";
     $result = mysqli_execute_query($conn, $sql, [$product_id]);
-    $row = mysqli_fetch_assoc($result);
 
-    if (!$row) {
+    if (mysqli_num_rows($result) === 0) {
         $_SESSION['message'] = 'product not found';
         header("Location: index.php");
         exit();
-    }
-
-    $oldPhoto = $row['img_path'];
-    $target = $oldPhoto;
-
-    if ($newPhoto) {
-        if ($_FILES['img_path']['type'] == "image/png") {
-            $ext = '.png';
-        } else {
-            $ext = '.jpg';
-        }
-        $source = $_FILES['img_path']['tmp_name'];
-        $target = 'images/' . time() . $ext;
-        move_uploaded_file($source, $target) or die("Couldn't copy");
     }
 
     $category_id = (int)$categoryInput;
@@ -131,9 +101,9 @@ if (isset($_POST['submit'])) {
     mysqli_begin_transaction($conn);
 
     try {
-        $sql = "UPDATE product SET category_id=?, name=?, brand=?, scent_type=?, size=?, unit=?, description=?, cost_price=?, sell_price=?, img_path=? WHERE product_id=?";
+        $sql = "UPDATE product SET category_id=?, name=?, brand=?, scent_type=?, size=?, unit=?, description=?, cost_price=?, sell_price=? WHERE product_id=?";
         $stmt1 = mysqli_prepare($conn, $sql);
-        mysqli_stmt_bind_param($stmt1, 'isssissddsi', $category_id, $name, $brand, $scent, $size, $unit, $description, $cost, $sell, $target, $product_id);
+        mysqli_stmt_bind_param($stmt1, 'isssissddi', $category_id, $name, $brand, $scent, $size, $unit, $description, $cost, $sell, $product_id);
         mysqli_stmt_execute($stmt1);
 
         $sql = "UPDATE stock SET quantity=? WHERE product_id=?";
@@ -147,11 +117,6 @@ if (isset($_POST['submit'])) {
         $_SESSION['message'] = 'Could not update the product: ' . $e->getMessage();
         header("Location: edit.php?id={$product_id}");
         exit();
-    }
-
-    // the old photo file is not needed anymore after a new one was saved
-    if ($newPhoto && file_exists($oldPhoto)) {
-        unlink($oldPhoto);
     }
 
     $_SESSION['success'] = 'Product updated successfully';

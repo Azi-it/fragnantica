@@ -12,13 +12,13 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'customer') {
 
 // only accept the form (POST), never a link
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    header("Location: orders.php");
+    header("Location: ../index.php");
     exit();
 }
 
 $order_id = filter_input(INPUT_POST, 'order_id', FILTER_VALIDATE_INT);
 if (!$order_id) {
-    header("Location: orders.php");
+    header("Location: ../index.php");
     exit();
 }
 
