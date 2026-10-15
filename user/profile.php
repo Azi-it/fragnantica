@@ -4,11 +4,7 @@ include("../includes/config.php");
 include("../includes/functions.php");
 
 // only logged in users can open their profile
-if (!isset($_SESSION['user_id'])) {
-    $_SESSION['message'] = 'please log in first';
-    header("Location: login.php");
-    exit();
-}
+require_login();
 
 $user_id = $_SESSION['user_id'];
 

@@ -3,6 +3,12 @@ session_start();
 include("../includes/config.php");
 include("../includes/functions.php");
 
+// already logged in: nothing to do here
+if (isset($_SESSION['user_id'])) {
+    header('Location: ' . after_login_url($_SESSION['role']));
+    exit();
+}
+
 if (isset($_POST['submit'])) {
 
     $email = trim($_POST['email']);
@@ -37,12 +43,10 @@ if (isset($_POST['submit'])) {
                     exit();
                 }
 
-                // admins go to the dashboard, customers go to the store
-                if ($row['role'] === 'admin') {
-                    header("Location: ../admin/index.php");
-                } else {
-                    header("Location: ../index.php");
-                }
+                // MP3: back to the page they were sent away from (e.g. Add Product),
+                // otherwise admins go to the dashboard and customers go to the store
+                $_SESSION['success'] = 'Welcome back, ' . e($row['name']) . '!';
+                header('Location: ' . after_login_url($row['role']));
                 exit();
             } else {
                 $_SESSION['message'] = 'wrong email or password';

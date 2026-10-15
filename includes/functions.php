@@ -290,14 +290,74 @@ function change_order_status($conn, $order_id, $newStatus, $actor_id, $role, $no
 // user accounts (photos, active/inactive status, roles)
 // ---------------------------------------------------------------
 
-// only admins may continue; everyone else is sent to the login page
-function require_admin()
+// ---------------------------------------------------------------
+// MP3: login and access control
+//   require_login()    any logged in user (My Profile)
+//   require_customer() customers only (cart, checkout, their orders)
+//   require_admin()    admins only (every CRUD page AND every script that changes data)
+//
+// - a visitor who is NOT logged in is sent to the login page with a message,
+//   and comes back to the page they wanted after logging in
+// - a logged in customer who opens an admin page is sent to the home page ("Access denied")
+// - an admin passes through
+// ---------------------------------------------------------------
+
+// send the visitor to the login page with a message, remembering where they wanted to go
+function redirect_to_login($message)
 {
-    if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'admin') {
-        $_SESSION['message'] = 'admin access only, please log in with an admin account';
-        header('Location: ' . BASE_PATH . '/user/login.php');
+    // only pages that are opened normally (GET) are remembered, not form submissions
+    if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_SERVER['REQUEST_URI'])) {
+        $_SESSION['after_login'] = $_SERVER['REQUEST_URI'];
+    }
+    $_SESSION['message'] = $message;
+    header('Location: ' . BASE_PATH . '/user/login.php');
+    exit();
+}
+
+function require_login()
+{
+    if (!isset($_SESSION['user_id'])) {
+        redirect_to_login('Please log in to continue.');
+    }
+}
+
+function require_customer()
+{
+    if (!isset($_SESSION['user_id'])) {
+        redirect_to_login('Please log in with your customer account to continue.');
+    }
+    if ($_SESSION['role'] !== 'customer') {
+        $_SESSION['message'] = 'That page is for customers. Admin accounts manage the store and cannot shop.';
+        header('Location: ' . BASE_PATH . '/index.php');
         exit();
     }
+}
+
+function require_admin()
+{
+    // not logged in at all: go and log in
+    if (!isset($_SESSION['user_id'])) {
+        redirect_to_login('Please log in with an admin account to open that page.');
+    }
+    // logged in, but an ordinary user: not allowed
+    if ($_SESSION['role'] !== 'admin') {
+        $_SESSION['message'] = 'Access denied. Only administrators can open that page.';
+        header('Location: ' . BASE_PATH . '/index.php');
+        exit();
+    }
+}
+
+// the page to open after logging in: the page the user was sent away from (if it is one of
+// ours), otherwise the dashboard for admins and the store for customers
+function after_login_url($role)
+{
+    $target = isset($_SESSION['after_login']) ? (string)$_SESSION['after_login'] : '';
+    unset($_SESSION['after_login']);
+    $ours = strpos($target, BASE_PATH . '/') === 0 && strpos($target, '//') === false && !preg_match('/[\r\n]/', $target);
+    if ($ours && strpos($target, '/user/login.php') === false) {
+        return $target;
+    }
+    return BASE_PATH . ($role === 'admin' ? '/admin/index.php' : '/index.php');
 }
 
 // read the logged in user again on every page, so a change made by an admin

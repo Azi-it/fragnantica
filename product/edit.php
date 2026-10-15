@@ -4,11 +4,7 @@ include('../includes/config.php');
 include('../includes/functions.php');
 
 // only admins can edit products
-if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'admin') {
-    $_SESSION['message'] = 'admin access only, please log in with an admin account';
-    header("Location: ../user/login.php");
-    exit();
-}
+require_admin();
 
 $product_id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
 

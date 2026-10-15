@@ -4,11 +4,7 @@ include('../includes/config.php');
 include('../includes/functions.php');
 
 // only admins can change order status
-if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'admin') {
-    $_SESSION['message'] = 'admin access only, please log in with an admin account';
-    header("Location: ../user/login.php");
-    exit();
-}
+require_admin();
 
 // only accept the form (POST), never a link
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {

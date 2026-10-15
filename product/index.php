@@ -4,11 +4,7 @@ include('../includes/config.php');
 include('../includes/functions.php');
 
 // only admins can see this page
-if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'admin') {
-    $_SESSION['message'] = 'admin access only, please log in with an admin account';
-    header("Location: ../user/login.php");
-    exit();
-}
+require_admin();
 
 include('../includes/header.php');
 

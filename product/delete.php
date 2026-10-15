@@ -4,11 +4,7 @@ include('../includes/config.php');
 include('../includes/functions.php');
 
 // only admins can delete products
-if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'admin') {
-    $_SESSION['message'] = 'admin access only, please log in with an admin account';
-    header("Location: ../user/login.php");
-    exit();
-}
+require_admin();
 
 // only accept the Delete button's form (POST) with its CSRF token, never a plain link,
 // so another website cannot delete products by tricking the admin into opening a URL

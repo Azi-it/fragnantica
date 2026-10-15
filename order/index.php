@@ -4,11 +4,7 @@ include('../includes/config.php');
 include('../includes/functions.php');
 
 // only admins can manage orders
-if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'admin') {
-    $_SESSION['message'] = 'admin access only, please log in with an admin account';
-    header("Location: ../user/login.php");
-    exit();
-}
+require_admin();
 
 $statuses = order_statuses();
 $perPage = 20;
