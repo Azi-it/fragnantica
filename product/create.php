@@ -1,6 +1,7 @@
 <?php
 session_start();
 include('../includes/config.php');
+include('../includes/functions.php');
 
 // only admins can add products
 if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'admin') {
@@ -175,12 +176,25 @@ $units = array('ml', 'g', 'pcs');
         </div>
 
         <div class="mb-3">
-            <label for="photo" class="form-label">Photo (JPG or PNG only)</label>
+            <label for="photo" class="form-label">Main Photo (JPG or PNG only, up to <?= MAX_PHOTO_BYTES / 1024 / 1024 ?> MB)</label>
             <input class="form-control" type="file" id="photo" name="img_path" accept=".jpg,.jpeg,.png" />
             <small class="text-danger"><?php
                     if (isset($_SESSION['imageError'])) {
                         echo $_SESSION['imageError'];
                         unset($_SESSION['imageError']);
+                    }
+                    ?></small>
+        </div>
+
+        <!-- MP1: more photos of the same product (optional). "multiple" lets the admin pick several files at once -->
+        <div class="mb-3">
+            <label for="photos" class="form-label">More Photos (optional, up to <?= MAX_PRODUCT_PHOTOS ?>)</label>
+            <input class="form-control" type="file" id="photos" name="photos[]" accept=".jpg,.jpeg,.png" multiple />
+            <div class="form-text">Hold Ctrl (or Cmd on a Mac) to choose several photos.</div>
+            <small class="text-danger"><?php
+                    if (isset($_SESSION['photosError'])) {
+                        echo $_SESSION['photosError'];
+                        unset($_SESSION['photosError']);
                     }
                     ?></small>
         </div>

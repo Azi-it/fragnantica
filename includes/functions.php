@@ -4,6 +4,7 @@
 
 require_once __DIR__ . '/settings.php';
 require_once __DIR__ . '/mail.php';
+require_once __DIR__ . '/uploads.php';
 
 // ---------------------------------------------------------------
 // output
@@ -283,4 +284,121 @@ function change_order_status($conn, $order_id, $newStatus, $actor_id, $role, $no
         return array(true, "Order #{$order_id} was cancelled and its items were returned to stock.");
     }
     return array(true, "Order #{$order_id} is now " . status_label($newStatus) . ".");
+}
+
+// ---------------------------------------------------------------
+// user accounts (photos, active/inactive status, roles)
+// ---------------------------------------------------------------
+
+// only admins may continue; everyone else is sent to the login page
+function require_admin()
+{
+    if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'admin') {
+        $_SESSION['message'] = 'admin access only, please log in with an admin account';
+        header('Location: ' . BASE_PATH . '/user/login.php');
+        exit();
+    }
+}
+
+// read the logged in user again on every page, so a change made by an admin
+// (deactivated account, new role, new name or photo) takes effect straight away
+function sync_session_user($conn)
+{
+    if (!isset($_SESSION['user_id'])) {
+        return;
+    }
+    try {
+        $sql = "SELECT name, email, img_path, role, status FROM users WHERE user_id = ? LIMIT 1";
+        $user = mysqli_fetch_assoc(mysqli_execute_query($conn, $sql, [$_SESSION['user_id']]));
+    } catch (mysqli_sql_exception $e) {
+        die('The database is out of date. In phpMyAdmin, import <b>migrations/003_user_photos_and_product_images.sql</b> and reload this page.');
+    }
+
+    // a deleted or deactivated account is logged out and sent to the login page
+    if (!$user || $user['status'] !== 'active') {
+        $_SESSION = array();
+        session_regenerate_id(true);
+        $_SESSION['message'] = 'Your account has been deactivated, so you have been logged out. Please contact the store if you think this is a mistake.';
+        header('Location: ' . BASE_PATH . '/user/login.php');
+        exit();
+    }
+    $_SESSION['name'] = $user['name'];
+    $_SESSION['email'] = $user['email'];
+    $_SESSION['role'] = $user['role'];
+    $_SESSION['photo'] = $user['img_path'];
+}
+
+// a submitted text field, trimmed; '' when it is missing or not text
+function post_value($key)
+{
+    return isset($_POST[$key]) && is_string($_POST[$key]) ? trim($_POST[$key]) : '';
+}
+
+// after a failed submit: remember the errors and what was typed, for the form to show once
+function keep_form($form, $errors, $old)
+{
+    $_SESSION['forms'][$form] = array('errors' => $errors, 'old' => $old);
+}
+
+// take back what keep_form() remembered (and forget it): array($errors, $old)
+function take_form($form)
+{
+    $saved = isset($_SESSION['forms'][$form]) ? $_SESSION['forms'][$form] : array('errors' => array(), 'old' => array());
+    unset($_SESSION['forms'][$form]);
+    return array($saved['errors'], $saved['old']);
+}
+
+// " is-invalid" for a field with an error (Bootstrap shows a red border)
+function invalid_class($errors, $field)
+{
+    return isset($errors[$field]) ? ' is-invalid' : '';
+}
+
+// the error message under a field
+function field_error($errors, $field)
+{
+    return isset($errors[$field]) ? "<div class='invalid-feedback d-block'>" . e($errors[$field]) . "</div>" : '';
+}
+
+// check a user's name and email; $ignoreUserId lets a user keep their own email when editing.
+// returns the errors as array(field => message)
+function user_field_errors($conn, $name, $email, $ignoreUserId = 0)
+{
+    $errors = array();
+    if ($name === '') {
+        $errors['name'] = 'Please enter a name.';
+    } else if (mb_strlen($name) > 100) {
+        $errors['name'] = 'The name should be 100 characters or less.';
+    }
+    if ($email === '') {
+        $errors['email'] = 'Please enter an email address.';
+    } else if (strlen($email) > 100 || filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
+        $errors['email'] = 'Please enter a valid email address.';
+    } else {
+        $sql = "SELECT user_id FROM users WHERE email = ? AND user_id <> ? LIMIT 1";
+        if (mysqli_fetch_assoc(mysqli_execute_query($conn, $sql, [$email, (int)$ignoreUserId]))) {
+            $errors['email'] = 'This email is already used by another account.';
+        }
+    }
+    return $errors;
+}
+
+// a user's profile photo, or a circle with their initials when they have none
+function avatar($name, $imgPath, $size = 40)
+{
+    $size = (int)$size;
+    if ($imgPath !== null && $imgPath !== '') {
+        return "<img src='" . e(BASE_PATH . '/' . $imgPath) . "' alt='' class='avatar' width='{$size}' height='{$size}'>";
+    }
+    $initials = '';
+    foreach (array_slice(preg_split('/\s+/', trim((string)$name)), 0, 2) as $part) {
+        $initials .= mb_strtoupper(mb_substr($part, 0, 1));
+    }
+    $font = round($size * 0.4);
+    return "<span class='avatar avatar-initials' style='width:{$size}px;height:{$size}px;font-size:{$font}px;' aria-hidden='true'>" . e($initials) . "</span>";
+}
+
+// every page that includes this file checks the logged in account again
+if (session_status() === PHP_SESSION_ACTIVE && isset($conn) && $conn instanceof mysqli) {
+    sync_session_user($conn);
 }

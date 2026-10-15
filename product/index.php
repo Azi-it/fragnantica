@@ -1,6 +1,7 @@
 <?php
 session_start();
 include('../includes/config.php');
+include('../includes/functions.php');
 
 // only admins can see this page
 if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'admin') {
@@ -11,7 +12,10 @@ if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'admin') {
 
 include('../includes/header.php');
 
-$sql = "SELECT p.*, c.name AS category, s.quantity FROM product p
+// photos = the main photo + the extra photos in product_images
+$sql = "SELECT p.*, c.name AS category, s.quantity,
+               1 + (SELECT COUNT(*) FROM product_images i WHERE i.product_id = p.product_id) AS photos
+        FROM product p
         INNER JOIN category c USING (category_id)
         INNER JOIN stock s USING (product_id)
         ORDER BY p.product_id DESC";
@@ -44,9 +48,10 @@ $productCount = mysqli_num_rows($result);
             <?php
             while ($row = mysqli_fetch_assoc($result)) {
                 echo "<tr>";
-                echo "<td><img src='{$row['img_path']}' width='80' height='80' class='product-photo' /></td>";
+                echo "<td><img src='" . e($row['img_path']) . "' width='80' height='80' class='product-photo' alt='' />"
+                    . "<div class='small text-muted text-center'><i class='fa-regular fa-images'></i> {$row['photos']}</div></td>";
                 echo "<td>{$row['product_id']}</td>";
-                echo "<td>{$row['name']}</td>";
+                echo "<td><a href='view.php?id={$row['product_id']}'>" . e($row['name']) . "</a></td>";
                 echo "<td>{$row['category']}</td>";
                 echo "<td>{$row['brand']}</td>";
                 echo "<td>{$row['scent_type']}</td>";
@@ -54,7 +59,13 @@ $productCount = mysqli_num_rows($result);
                 echo "<td>{$row['cost_price']}</td>";
                 echo "<td>{$row['sell_price']}</td>";
                 echo "<td>{$row['quantity']}</td>";
-                echo "<td><a href='edit.php?id={$row['product_id']}' title='Edit'><i class='fa-regular fa-pen-to-square' style='color: blue'></i></a></td>";
+                // Edit is a link; Delete is a small form (POST + CSRF token), see delete.php
+                echo "<td class='text-nowrap'><a href='edit.php?id={$row['product_id']}' title='Edit' class='btn btn-sm btn-link px-1'><i class='fa-regular fa-pen-to-square' style='color: blue'></i></a>"
+                    . "<form action='delete.php' method='POST' class='d-inline' onsubmit=\"return confirm('Delete this product and all its photos?');\">"
+                    . csrf_field()
+                    . "<input type='hidden' name='product_id' value='{$row['product_id']}'>"
+                    . "<button type='submit' class='btn btn-sm btn-link px-1' title='Delete'><i class='fa-solid fa-trash' style='color: red'></i></button>"
+                    . "</form></td>";
                 echo "</tr>";
             }
             ?>

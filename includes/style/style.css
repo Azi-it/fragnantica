@@ -247,3 +247,62 @@ ul.products li h3 a:hover {
     padding-top: 4px;
     font-variant-numeric: tabular-nums;
 }
+
+/* profile photos (MP2) */
+.avatar {
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+}
+
+/* a circle with the user's initials when they have no photo */
+.avatar-initials {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #8B1E3F;
+    color: #FFFFFF;
+    font-family: "Trebuchet MS", Arial, Helvetica, sans-serif;
+    font-weight: bold;
+}
+
+/* product photo gallery (MP1) */
+.gallery-thumbs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.gallery-thumbs button {
+    padding: 2px;
+    border: 2px solid #EAEAEA;
+    background-color: #FFFFFF;
+    border-radius: 4px;
+}
+
+.gallery-thumbs button.active,
+.gallery-thumbs button:hover {
+    border-color: #8B1E3F;
+}
+
+.gallery-thumbs img {
+    width: 64px;
+    height: 64px;
+    object-fit: contain;
+    display: block;
+}
+
+/* extra photos on the Edit Product page (MP1) */
+.photo-tile {
+    width: 110px;
+    text-align: center;
+}
+
+.photo-tile img {
+    width: 100px;
+    height: 100px;
+    object-fit: contain;
+    border: 1px solid #EAEAEA;
+    background-color: #FFFFFF;
+}

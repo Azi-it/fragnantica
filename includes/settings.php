@@ -9,6 +9,9 @@ date_default_timezone_set('Asia/Manila');
 // change this when the site is moved to a real domain
 define('APP_URL', 'http://localhost/Fragnantica');
 
+// the path part of APP_URL ("/Fragnantica"), used for links and redirects inside the site
+define('BASE_PATH', rtrim((string)parse_url(APP_URL, PHP_URL_PATH), '/'));
+
 // how emails are delivered:
 //   'log'  = saved as files in storage/mail/ instead of being sent (default, works without any setup)
 //   'mail' = really sent through PHP's mail() function; set up XAMPP's sendmail first (see docs/EMAIL_SETUP.md)
@@ -31,3 +34,9 @@ define('ALLOW_REMOTE_SETUP', false);
 // passwords that were published with older versions of this project.
 // an admin who logs in with one of these is sent to change it.
 define('KNOWN_DEFAULT_PASSWORDS', array('admin123'));
+
+// largest photo that can be uploaded (products and profile pictures), in bytes
+define('MAX_PHOTO_BYTES', 2 * 1024 * 1024);
+
+// how many extra photos one product may have (besides its main photo)
+define('MAX_PRODUCT_PHOTOS', 8);

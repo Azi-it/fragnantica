@@ -37,6 +37,7 @@
                         echo '<li class="nav-item"><a class="nav-link" href="/Fragnantica/product/index.php">Products</a></li>';
                         echo '<li class="nav-item"><a class="nav-link" href="/Fragnantica/product/create.php">Add Product</a></li>';
                         echo '<li class="nav-item"><a class="nav-link" href="/Fragnantica/order/index.php"><i class="fa-solid fa-receipt"></i> Orders</a></li>';
+                        echo '<li class="nav-item"><a class="nav-link" href="/Fragnantica/admin/users/index.php"><i class="fa-solid fa-users"></i> Users</a></li>';
                     }
 
                     // links for any logged in user
@@ -60,8 +61,11 @@
                         <a href='/Fragnantica/user/login.php' class='nav-item nav-link'>Login</a>
                         <a href='/Fragnantica/user/register.php' class='nav-item nav-link'>Register</a></div>";
                 } else {
-                    echo "<div class='navbar-nav ms-auto'>
-                        <span class='nav-item nav-link'><i class='fa-solid fa-user'></i> " . htmlspecialchars($_SESSION['name'], ENT_QUOTES, 'UTF-8') . "</span>
+                    // MP2: the user's photo (or their initials) next to their name
+                    $navName = htmlspecialchars($_SESSION['name'], ENT_QUOTES, 'UTF-8');
+                    $navPhoto = function_exists('avatar') ? avatar($_SESSION['name'], $_SESSION['photo'] ?? null, 28) : "<i class='fa-solid fa-user'></i>";
+                    echo "<div class='navbar-nav ms-auto align-items-lg-center'>
+                        <a href='/Fragnantica/user/profile.php' class='nav-item nav-link d-flex align-items-center gap-2'>{$navPhoto} {$navName}</a>
                         <a href='/Fragnantica/user/logout.php' class='nav-item nav-link'>Logout</a></div>";
                 }
                 ?>

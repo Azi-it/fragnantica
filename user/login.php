@@ -11,18 +11,22 @@ if (isset($_POST['submit'])) {
     if ($email === '' || $password === '') {
         $_SESSION['message'] = 'please enter your email and password';
     } else {
-        $sql = "SELECT user_id, name, email, password, role FROM users WHERE email=? LIMIT 1";
+        $sql = "SELECT user_id, name, email, password, img_path, role, status FROM users WHERE email=? LIMIT 1";
         $result = mysqli_execute_query($conn, $sql, [$email]);
 
         if (mysqli_num_rows($result) === 1) {
             $row = mysqli_fetch_assoc($result);
-            if (password_verify($password, $row['password'])) {
+            if (password_verify($password, $row['password']) && $row['status'] !== 'active') {
+                // MP2: an admin deactivated this account
+                $_SESSION['message'] = 'this account has been deactivated, please contact the store';
+            } else if (password_verify($password, $row['password'])) {
                 // new session id on login, so a session id planted before login is useless
                 session_regenerate_id(true);
                 $_SESSION['user_id'] = $row['user_id'];
                 $_SESSION['name'] = $row['name'];
                 $_SESSION['email'] = $row['email'];
                 $_SESSION['role'] = $row['role'];
+                $_SESSION['photo'] = $row['img_path'];
 
                 // an admin still using a password that was published with this project
                 // must change it before doing anything else

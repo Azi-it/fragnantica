@@ -1,8 +1,9 @@
 -- Online Fragrance & Scent Products Store
--- Database: users, customer, category, product, stock, cart, orders, order_items, order_status_history, password_resets
+-- Database: users, customer, category, product, product_images, stock, cart, orders, order_items,
+--           order_status_history, password_resets
 --
 -- Already have the database from an older version and want to keep its data?
--- Run the files in migrations/ in order (001, then 002) instead of this file.
+-- Run the files in migrations/ in order (001, 002, then 003) instead of this file.
 --
 -- How to import: open phpMyAdmin > Import > choose this file > Go
 -- WARNING: importing this file again deletes all data in these tables.
@@ -16,6 +17,7 @@ SET NAMES utf8mb4;
 CREATE DATABASE IF NOT EXISTS fragrance_store;
 USE fragrance_store;
 
+DROP TABLE IF EXISTS product_images;
 DROP TABLE IF EXISTS password_resets;
 DROP TABLE IF EXISTS order_status_history;
 DROP TABLE IF EXISTS order_items;
@@ -28,12 +30,16 @@ DROP TABLE IF EXISTS customer;
 DROP TABLE IF EXISTS users;
 
 -- customers and admins
+-- img_path: profile photo (user/images/...), NULL = no photo
+-- status: an admin deactivates an account instead of deleting it, so its orders are kept
 CREATE TABLE users (
     user_id INT PRIMARY KEY NOT NULL AUTO_INCREMENT,
     name VARCHAR(100) NOT NULL,
     email VARCHAR(100) NOT NULL UNIQUE,
     password VARCHAR(255) NOT NULL,
+    img_path VARCHAR(255) NULL,
     role ENUM('customer', 'admin') NOT NULL DEFAULT 'customer',
+    status ENUM('active', 'inactive') NOT NULL DEFAULT 'active',
     created_at DATETIME NOT NULL
 );
 
@@ -69,6 +75,15 @@ CREATE TABLE product (
     sell_price DECIMAL(10,2) NOT NULL,
     img_path VARCHAR(255) NOT NULL,
     FOREIGN KEY (category_id) REFERENCES category (category_id)
+);
+
+-- extra photos of a product (the main photo is product.img_path)
+CREATE TABLE product_images (
+    image_id INT PRIMARY KEY NOT NULL AUTO_INCREMENT,
+    product_id INT NOT NULL,
+    img_path VARCHAR(255) NOT NULL,
+    uploaded_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (product_id) REFERENCES product (product_id) ON DELETE CASCADE
 );
 
 -- how many pieces of each product are available

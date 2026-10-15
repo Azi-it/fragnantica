@@ -1,6 +1,7 @@
 <?php
 session_start();
 include('../includes/config.php');
+include('../includes/functions.php');
 
 // only admins can edit products
 if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'admin') {
@@ -25,6 +26,10 @@ if (!$product) {
     header("Location: index.php");
     exit();
 }
+
+// MP1: the product's extra photos (the main photo is product.img_path)
+$sql = "SELECT image_id, img_path FROM product_images WHERE product_id = ? ORDER BY image_id";
+$extraPhotos = mysqli_fetch_all(mysqli_execute_query($conn, $sql, [$product_id]), MYSQLI_ASSOC);
 
 // after a failed update show what the admin typed, otherwise show the saved values
 $name = isset($_SESSION['productName']) ? $_SESSION['productName'] : $product['name'];
@@ -53,7 +58,7 @@ $units = array('ml', 'g', 'pcs');
 <div class="container mt-4">
     <h2>Edit Product</h2>
     <?php include('../includes/alert.php'); ?>
-    <form method="POST" action="update.php">
+    <form method="POST" action="update.php" enctype="multipart/form-data">
         <input type="hidden" name="product_id" value="<?php echo $product['product_id']; ?>" />
 
         <div class="row gx-3 mb-3">
@@ -202,8 +207,46 @@ $units = array('ml', 'g', 'pcs');
         </div>
 
         <div class="mb-3">
-            <label class="form-label">Current Photo</label><br />
-            <img src="<?php echo $product['img_path']; ?>" width="120" height="120" class="product-photo border mb-2" />
+            <label class="form-label">Main Photo</label><br />
+            <img src="<?= e($product['img_path']) ?>" width="120" height="120" class="product-photo border mb-2" alt="Main photo" />
+            <br />
+            <label for="photo" class="form-label">New Main Photo (JPG or PNG only, leave empty to keep the current photo)</label>
+            <input class="form-control" type="file" id="photo" name="img_path" accept=".jpg,.jpeg,.png" />
+            <small class="text-danger"><?php
+                    if (isset($_SESSION['imageError'])) {
+                        echo $_SESSION['imageError'];
+                        unset($_SESSION['imageError']);
+                    }
+                    ?></small>
+        </div>
+
+        <!-- MP1: the extra photos; tick "Remove" to delete one -->
+        <?php if ($extraPhotos): ?>
+            <div class="mb-3">
+                <label class="form-label">More Photos <span class="small text-muted">(tick a photo to remove it)</span></label>
+                <div class="d-flex flex-wrap gap-2">
+                    <?php foreach ($extraPhotos as $photo): ?>
+                        <label class="photo-tile">
+                            <img src="<?= e($photo['img_path']) ?>" alt="Extra photo">
+                            <span class="d-block small mt-1">
+                                <input type="checkbox" class="form-check-input" name="delete_photos[]" value="<?= (int)$photo['image_id'] ?>"> Remove
+                            </span>
+                        </label>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+        <?php endif; ?>
+
+        <div class="mb-3">
+            <label for="photos" class="form-label">Add More Photos (optional, a product can have up to <?= MAX_PRODUCT_PHOTOS ?>)</label>
+            <input class="form-control" type="file" id="photos" name="photos[]" accept=".jpg,.jpeg,.png" multiple />
+            <div class="form-text">Hold Ctrl (or Cmd on a Mac) to choose several photos.</div>
+            <small class="text-danger"><?php
+                    if (isset($_SESSION['photosError'])) {
+                        echo $_SESSION['photosError'];
+                        unset($_SESSION['photosError']);
+                    }
+                    ?></small>
         </div>
 
         <button type="submit" class="btn btn-primary" name="submit">Save Changes</button>

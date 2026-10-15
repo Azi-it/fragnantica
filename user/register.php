@@ -1,5 +1,7 @@
 <?php
 session_start();
+include("../includes/config.php");
+include("../includes/functions.php");
 include("../includes/header.php");
 
 ?>
@@ -7,17 +9,17 @@ include("../includes/header.php");
     <div class="row col-md-6 mx-auto mt-4">
         <h2>Create an Account</h2>
         <?php include("../includes/alert.php"); ?>
-        <form action="store.php" method="POST">
+        <form action="store.php" method="POST" enctype="multipart/form-data">
             <div class="mb-3">
                 <label for="name" class="form-label">Name</label>
                 <input type="text" class="form-control" id="name" name="name"
-                    value="<?php if (isset($_SESSION['regName'])) echo $_SESSION['regName']; ?>">
+                    value="<?php if (isset($_SESSION['regName'])) echo e($_SESSION['regName']); ?>">
             </div>
 
             <div class="mb-3">
                 <label for="email" class="form-label">Email</label>
                 <input type="text" class="form-control" id="email" name="email"
-                    value="<?php if (isset($_SESSION['regEmail'])) echo $_SESSION['regEmail']; ?>">
+                    value="<?php if (isset($_SESSION['regEmail'])) echo e($_SESSION['regEmail']); ?>">
             </div>
 
             <div class="mb-3">
@@ -29,6 +31,12 @@ include("../includes/header.php");
             <div class="mb-3">
                 <label for="password2" class="form-label">Confirm Password</label>
                 <input type="password" class="form-control" id="password2" name="confirmPass">
+            </div>
+
+            <!-- MP2: a profile photo can be uploaded when registering -->
+            <div class="mb-3">
+                <label for="photo" class="form-label">Profile Photo (optional, JPG or PNG, up to <?= MAX_PHOTO_BYTES / 1024 / 1024 ?> MB)</label>
+                <input type="file" class="form-control" id="photo" name="photo" accept=".jpg,.jpeg,.png">
             </div>
 
             <button type="submit" class="btn btn-primary" name="submit">Register</button>

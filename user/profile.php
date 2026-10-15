@@ -12,6 +12,42 @@ if (!isset($_SESSION['user_id'])) {
 
 $user_id = $_SESSION['user_id'];
 
+// ---------- MP2: profile photo, upload a new one or remove it ----------
+if (isset($_POST['upload_photo']) || isset($_POST['remove_photo'])) {
+    $sql = "SELECT img_path FROM users WHERE user_id = ? LIMIT 1";
+    $oldPhoto = mysqli_fetch_assoc(mysqli_execute_query($conn, $sql, [$user_id]))['img_path'] ?? null;
+
+    if (!csrf_valid()) {
+        $_SESSION['message'] = 'Your session expired. Please try again.';
+    } else if (isset($_POST['remove_photo'])) {
+        mysqli_execute_query($conn, "UPDATE users SET img_path = NULL WHERE user_id = ?", [$user_id]);
+        if ($oldPhoto) {
+            delete_photo_file(__DIR__ . '/../' . $oldPhoto);
+        }
+        $_SESSION['success'] = 'profile photo removed';
+    } else {
+        $photo = isset($_FILES['photo']) ? $_FILES['photo'] : null;
+        $error = photo_upload_error($photo, true);
+        $fileName = $error === '' ? save_photo($photo, __DIR__ . '/images') : '';
+
+        if ($error !== '') {
+            $_SESSION['message'] = $error;
+        } else if ($fileName === '') {
+            $_SESSION['message'] = 'The photo could not be saved. Please try again.';
+        } else {
+            mysqli_execute_query($conn, "UPDATE users SET img_path = ? WHERE user_id = ?", ['user/images/' . $fileName, $user_id]);
+            // the old photo file is not needed anymore
+            if ($oldPhoto) {
+                delete_photo_file(__DIR__ . '/../' . $oldPhoto);
+            }
+            $_SESSION['photo'] = 'user/images/' . $fileName;
+            $_SESSION['success'] = 'profile photo updated';
+        }
+    }
+    header("Location: profile.php");
+    exit();
+}
+
 // ---------- change password ----------
 if (isset($_POST['change_password'])) {
     $current = isset($_POST['current_password']) && is_string($_POST['current_password']) ? trim($_POST['current_password']) : '';
@@ -97,7 +133,7 @@ if (isset($_POST['submit'])) {
 }
 
 // get the saved details (customer columns are empty if the profile is not filled in yet)
-$sql = "SELECT u.name, u.email, c.addressline, c.town, c.zipcode, c.phone FROM users u LEFT JOIN customer c USING (user_id) WHERE u.user_id=? LIMIT 1";
+$sql = "SELECT u.name, u.email, u.img_path, c.addressline, c.town, c.zipcode, c.phone FROM users u LEFT JOIN customer c USING (user_id) WHERE u.user_id=? LIMIT 1";
 $result = mysqli_execute_query($conn, $sql, [$user_id]);
 $profile = mysqli_fetch_assoc($result);
 
@@ -117,6 +153,24 @@ include("../includes/header.php");
     <?php include("../includes/alert.php"); ?>
     <div class="row">
         <div class="col-xl-8 mx-auto">
+            <!-- MP2: the profile photo -->
+            <div class="card mb-4">
+                <div class="card-header">Profile Photo</div>
+                <div class="card-body d-flex flex-wrap align-items-center gap-4">
+                    <?= avatar($profile['name'], $profile['img_path'], 120) ?>
+                    <form action="profile.php" method="POST" enctype="multipart/form-data" class="flex-fill">
+                        <?= csrf_field() ?>
+                        <label class="small mb-1" for="photo">Upload a new photo (JPG or PNG, up to <?= MAX_PHOTO_BYTES / 1024 / 1024 ?> MB)</label>
+                        <input class="form-control mb-2" id="photo" type="file" name="photo" accept=".jpg,.jpeg,.png">
+                        <button class="btn btn-primary" type="submit" name="upload_photo">Upload photo</button>
+                        <?php if ($profile['img_path']): ?>
+                            <button class="btn btn-outline-danger" type="submit" name="remove_photo"
+                                onclick="return confirm('Remove your profile photo?');">Remove photo</button>
+                        <?php endif; ?>
+                    </form>
+                </div>
+            </div>
+
             <div class="card mb-4">
                 <div class="card-header">My Profile</div>
                 <div class="card-body">

@@ -1,6 +1,7 @@
 <?php
 session_start();
 include('../includes/config.php');
+include('../includes/functions.php');
 
 // only admins can add products
 if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'admin') {
@@ -65,16 +66,28 @@ if (isset($_POST['submit'])) {
         $hasErrors = true;
     }
 
-    // photo is required, and only JPG and PNG are accepted
-    if (!isset($_FILES['img_path']) || $_FILES['img_path']['error'] === UPLOAD_ERR_NO_FILE) {
-        $_SESSION['imageError'] = 'Please select a photo';
+    // the main photo is required, and only real JPG and PNG files are accepted
+    $mainPhoto = isset($_FILES['img_path']) ? $_FILES['img_path'] : null;
+    $photoError = photo_upload_error($mainPhoto, true);
+    if ($photoError !== '') {
+        $_SESSION['imageError'] = $photoError;
         $hasErrors = true;
-    } else if ($_FILES['img_path']['error'] !== UPLOAD_ERR_OK) {
-        $_SESSION['imageError'] = 'Photo upload failed, please try again';
+    }
+
+    // MP1: more photos are optional; each one is checked the same way
+    $extraPhotos = uploaded_files_list(isset($_FILES['photos']) ? $_FILES['photos'] : null);
+    if (count($extraPhotos) > MAX_PRODUCT_PHOTOS) {
+        $_SESSION['photosError'] = 'You can add up to ' . MAX_PRODUCT_PHOTOS . ' more photos.';
         $hasErrors = true;
-    } else if ($_FILES['img_path']['type'] != "image/jpeg" && $_FILES['img_path']['type'] != "image/jpg" && $_FILES['img_path']['type'] != "image/png") {
-        $_SESSION['imageError'] = 'Only JPG and PNG photos are accepted';
-        $hasErrors = true;
+    } else {
+        foreach ($extraPhotos as $file) {
+            $error = photo_upload_error($file, true);
+            if ($error !== '') {
+                $_SESSION['photosError'] = $file['name'] . ': ' . $error;
+                $hasErrors = true;
+                break;
+            }
+        }
     }
 
     if ($hasErrors) {
@@ -99,17 +112,24 @@ if (isset($_POST['submit'])) {
     $sell = (float)$sellInput;
     $qty = (int)$qtyInput;
 
-    // save the photo in the images folder with a new name so files do not overwrite each other
-    if ($_FILES['img_path']['type'] == "image/png") {
-        $ext = '.png';
-    } else {
-        $ext = '.jpg';
+    // save the photos in the images folder, each with a new random name so files do not overwrite each other
+    $saved = array();
+    foreach (array_merge(array($mainPhoto), $extraPhotos) as $file) {
+        $fileName = save_photo($file, __DIR__ . '/images');
+        if ($fileName === '') {
+            foreach ($saved as $path) {
+                delete_photo_file(__DIR__ . '/' . $path);
+            }
+            $_SESSION['message'] = 'The photos could not be saved. Please try again.';
+            header("Location: create.php");
+            exit();
+        }
+        $saved[] = 'images/' . $fileName;
     }
-    $source = $_FILES['img_path']['tmp_name'];
-    $target = 'images/' . time() . $ext;
-    move_uploaded_file($source, $target) or die("Couldn't copy");
+    $target = $saved[0];                    // the main photo
+    $extraPaths = array_slice($saved, 1);   // the other photos
 
-    // save the product and its stock together
+    // save the product, its stock and its extra photos together
     mysqli_begin_transaction($conn);
 
     try {
@@ -124,15 +144,27 @@ if (isset($_POST['submit'])) {
         mysqli_stmt_bind_param($stmt2, 'ii', $product_id, $qty);
         mysqli_stmt_execute($stmt2);
 
+        // one row in product_images per extra photo
+        $sql = "INSERT INTO product_images (product_id, img_path) VALUES (?, ?)";
+        $stmt3 = mysqli_prepare($conn, $sql);
+        foreach ($extraPaths as $path) {
+            mysqli_stmt_bind_param($stmt3, 'is', $product_id, $path);
+            mysqli_stmt_execute($stmt3);
+        }
+
         mysqli_commit($conn);
     } catch (mysqli_sql_exception $e) {
         mysqli_rollback($conn);
+        // the product was not saved, so its photo files are not needed
+        foreach ($saved as $path) {
+            delete_photo_file(__DIR__ . '/' . $path);
+        }
         $_SESSION['message'] = 'Could not save the product: ' . $e->getMessage();
         header("Location: create.php");
         exit();
     }
 
-    $_SESSION['success'] = 'Product added successfully';
+    $_SESSION['success'] = 'Product added successfully with ' . count($saved) . ' photo' . (count($saved) === 1 ? '' : 's');
     header("Location: index.php");
     exit();
 }

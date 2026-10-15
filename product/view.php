@@ -23,6 +23,13 @@ if (!$product) {
     exit();
 }
 
+// MP1: all photos of the product, the main photo first, then the extra photos
+$photos = array($product['img_path']);
+$result = mysqli_execute_query($conn, "SELECT img_path FROM product_images WHERE product_id = ? ORDER BY image_id", [$product_id]);
+while ($row = mysqli_fetch_assoc($result)) {
+    $photos[] = $row['img_path'];
+}
+
 // up to 4 other products from the same category, in-stock ones first
 $relatedSql = "SELECT p.product_id, p.name, p.brand, p.sell_price, p.img_path, s.quantity AS stock
                FROM product p
@@ -58,7 +65,18 @@ include('../includes/header.php');
 
     <div class="row g-4">
         <div class="col-md-5">
-            <img src="<?= e($product['img_path']) ?>" class="product-detail-photo" alt="<?= e($product['name']) ?>">
+            <img src="<?= e($photos[0]) ?>" id="main-photo" class="product-detail-photo" alt="<?= e($product['name']) ?>">
+            <?php if (count($photos) > 1): ?>
+                <!-- MP1: small photos under the big one; clicking one shows it in the big frame -->
+                <div class="gallery-thumbs" role="group" aria-label="Product photos">
+                    <?php foreach ($photos as $i => $photo): ?>
+                        <button type="button" class="<?= $i === 0 ? 'active' : '' ?>" data-photo="<?= e($photo) ?>" aria-label="Show photo <?= $i + 1 ?> of <?= count($photos) ?>">
+                            <img src="<?= e($photo) ?>" alt="">
+                        </button>
+                    <?php endforeach; ?>
+                </div>
+                <p class="small text-muted mt-1 mb-0"><?= count($photos) ?> photos. Click one to see it bigger.</p>
+            <?php endif; ?>
         </div>
         <div class="col-md-7">
             <p class="text-uppercase text-muted small mb-1"><?= e($product['category']) ?></p>
@@ -121,4 +139,14 @@ include('../includes/header.php');
         </div>
     <?php endif; ?>
 </div>
+<script>
+    // photo gallery: clicking a small photo shows it in the big frame
+    document.querySelectorAll('.gallery-thumbs button').forEach(function (button) {
+        button.addEventListener('click', function () {
+            document.getElementById('main-photo').src = button.dataset.photo;
+            document.querySelectorAll('.gallery-thumbs button').forEach(function (b) { b.classList.remove('active'); });
+            button.classList.add('active');
+        });
+    });
+</script>
 <?php include('../includes/footer.php'); ?>

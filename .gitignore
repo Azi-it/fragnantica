@@ -7,3 +7,7 @@ product/images/*
 # emails saved by MAIL_DRIVER 'log' (they contain password reset links)
 storage/mail/*
 !storage/mail/.gitkeep
+
+# profile photos uploaded by users
+user/images/*
+!user/images/.gitkeep
