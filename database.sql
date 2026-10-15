@@ -1,9 +1,9 @@
 -- Online Fragrance & Scent Products Store
 -- Database: users, customer, category, product, product_images, stock, cart, orders, order_items,
---           order_status_history, password_resets
+--           order_status_history, password_resets, review
 --
 -- Already have the database from an older version and want to keep its data?
--- Run the files in migrations/ in order (001, 002, then 003) instead of this file.
+-- Run the files in migrations/ in order (001, 002, 003, then 004) instead of this file.
 --
 -- How to import: open phpMyAdmin > Import > choose this file > Go
 -- WARNING: importing this file again deletes all data in these tables.
@@ -17,6 +17,7 @@ SET NAMES utf8mb4;
 CREATE DATABASE IF NOT EXISTS fragrance_store;
 USE fragrance_store;
 
+DROP TABLE IF EXISTS review;
 DROP TABLE IF EXISTS product_images;
 DROP TABLE IF EXISTS password_resets;
 DROP TABLE IF EXISTS order_status_history;
@@ -155,6 +156,22 @@ CREATE TABLE password_resets (
     used_at DATETIME NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users (user_id) ON DELETE CASCADE
+);
+
+-- product reviews: one review per customer per product.
+-- only a customer with a completed order of the product may write one (checked in PHP)
+CREATE TABLE review (
+    review_id INT PRIMARY KEY NOT NULL AUTO_INCREMENT,
+    product_id INT NOT NULL,
+    user_id INT NOT NULL,
+    rating TINYINT NOT NULL,
+    comment VARCHAR(1000) NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NULL,
+    UNIQUE (product_id, user_id),
+    CHECK (rating BETWEEN 1 AND 5),
+    FOREIGN KEY (product_id) REFERENCES product (product_id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users (user_id)
 );
 
 -- the storefront filters and sorts by these

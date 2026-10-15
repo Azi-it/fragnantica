@@ -5,6 +5,7 @@
 require_once __DIR__ . '/settings.php';
 require_once __DIR__ . '/mail.php';
 require_once __DIR__ . '/uploads.php';
+require_once __DIR__ . '/profanity.php';
 
 // ---------------------------------------------------------------
 // output
@@ -456,6 +457,39 @@ function avatar($name, $imgPath, $size = 40)
     }
     $font = round($size * 0.4);
     return "<span class='avatar avatar-initials' style='width:{$size}px;height:{$size}px;font-size:{$font}px;' aria-hidden='true'>" . e($initials) . "</span>";
+}
+
+// ---------------------------------------------------------------
+// MP4: reviews
+// ---------------------------------------------------------------
+
+// a customer may review a product once they have "availed" it:
+// they have a COMPLETED order (delivered) that contains this product
+function can_review_product($conn, $user_id, $product_id)
+{
+    $sql = "SELECT 1
+            FROM order_items oi
+            INNER JOIN orders o USING (order_id)
+            WHERE o.user_id = ? AND oi.product_id = ? AND o.status = 'completed'
+            LIMIT 1";
+    return (bool)mysqli_fetch_assoc(mysqli_execute_query($conn, $sql, [$user_id, $product_id]));
+}
+
+// 1 to 5 stars; halves are shown for averages like 4.5
+function stars($rating)
+{
+    $rating = (float)$rating;
+    $html = "<span class='stars' title='" . e(number_format($rating, 1)) . " out of 5'>";
+    for ($i = 1; $i <= 5; $i++) {
+        if ($rating >= $i) {
+            $html .= "<i class='fa-solid fa-star'></i>";
+        } else if ($rating >= $i - 0.5) {
+            $html .= "<i class='fa-solid fa-star-half-stroke'></i>";
+        } else {
+            $html .= "<i class='fa-regular fa-star'></i>";
+        }
+    }
+    return $html . "<span class='visually-hidden'>" . e(number_format($rating, 1)) . " out of 5 stars</span></span>";
 }
 
 // every page that includes this file checks the logged in account again
