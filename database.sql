@@ -1,29 +1,31 @@
--- Online Fragrance & Scent Products Store
--- Database: users, customer, category, product, product_images, stock, cart, orders, order_items,
---           order_status_history, password_resets, review
+-- Veloura: online fragrance store
+-- tables: users, customer, category, product, product_images, stock, orders, order_items, review
+-- views:  order_details_view, order_totals_view (order transaction details)
 --
--- Already have the database from an older version and want to keep its data?
--- Run the files in migrations/ in order (001, 002, 003, then 004) instead of this file.
---
--- How to import: open phpMyAdmin > Import > choose this file > Go
+-- how to import: phpMyAdmin > Import > choose this file > Go
 -- WARNING: importing this file again deletes all data in these tables.
 --
--- There is no built-in admin account. After importing, open
---   http://localhost/Fragnantica/setup.php
--- on the same computer and create the admin with your own email and password.
-
-SET NAMES utf8mb4;
+-- accounts that come with the database:
+--   admin    admin@veloura.test     / admin123
+--   customer customer@veloura.test  / customer123
 
 CREATE DATABASE IF NOT EXISTS fragrance_store;
 USE fragrance_store;
 
-DROP TABLE IF EXISTS review;
-DROP TABLE IF EXISTS product_images;
-DROP TABLE IF EXISTS password_resets;
+DROP VIEW IF EXISTS order_totals_view;
+DROP VIEW IF EXISTS order_details_view;
+
+-- tables and views from the older version of this project
+DROP VIEW IF EXISTS order_summary_view;
 DROP TABLE IF EXISTS order_status_history;
+DROP TABLE IF EXISTS password_resets;
+DROP TABLE IF EXISTS cart;
+
+DROP TABLE IF EXISTS review;
 DROP TABLE IF EXISTS order_items;
 DROP TABLE IF EXISTS orders;
-DROP TABLE IF EXISTS cart;
+DROP TABLE IF EXISTS coupon;
+DROP TABLE IF EXISTS product_images;
 DROP TABLE IF EXISTS stock;
 DROP TABLE IF EXISTS product;
 DROP TABLE IF EXISTS category;
@@ -31,8 +33,7 @@ DROP TABLE IF EXISTS customer;
 DROP TABLE IF EXISTS users;
 
 -- customers and admins
--- img_path: profile photo (user/images/...), NULL = no photo
--- status: an admin deactivates an account instead of deleting it, so its orders are kept
+-- img_path: profile photo (user/images/...)
 CREATE TABLE users (
     user_id INT PRIMARY KEY NOT NULL AUTO_INCREMENT,
     name VARCHAR(100) NOT NULL,
@@ -44,7 +45,7 @@ CREATE TABLE users (
     created_at DATETIME NOT NULL
 );
 
--- customer delivery details (one row per user, filled in on the profile page)
+-- delivery details, one row per user (filled in on the profile page)
 CREATE TABLE customer (
     customer_id INT PRIMARY KEY NOT NULL AUTO_INCREMENT,
     user_id INT NOT NULL UNIQUE,
@@ -52,179 +53,132 @@ CREATE TABLE customer (
     town VARCHAR(100) NOT NULL,
     zipcode VARCHAR(10) NOT NULL,
     phone VARCHAR(20) NOT NULL,
-    FOREIGN KEY (user_id) REFERENCES users (user_id)
+    FOREIGN KEY (user_id) REFERENCES users (user_id) ON DELETE CASCADE
 );
 
--- product categories (perfumes, scented candles, reed diffusers, ...)
 CREATE TABLE category (
     category_id INT PRIMARY KEY NOT NULL AUTO_INCREMENT,
     name VARCHAR(50) NOT NULL UNIQUE
 );
 
--- fragrance and scent products
--- size + unit: 100 ml (perfume), 200 g (candle), 1 pcs (car fragrance)
+-- img_path: the main photo (product/images/...)
 CREATE TABLE product (
     product_id INT PRIMARY KEY NOT NULL AUTO_INCREMENT,
     category_id INT NOT NULL,
     name VARCHAR(100) NOT NULL,
     brand VARCHAR(100) NOT NULL,
-    scent_type VARCHAR(50) NOT NULL,
-    size INT NOT NULL,
-    unit ENUM('ml', 'g', 'pcs') NOT NULL DEFAULT 'ml',
-    description VARCHAR(255) NULL,
+    size VARCHAR(30) NOT NULL,
+    description VARCHAR(255) NOT NULL,
     cost_price DECIMAL(10,2) NOT NULL,
     sell_price DECIMAL(10,2) NOT NULL,
     img_path VARCHAR(255) NOT NULL,
     FOREIGN KEY (category_id) REFERENCES category (category_id)
 );
 
--- extra photos of a product (the main photo is product.img_path)
+-- more photos of a product, many per product
 CREATE TABLE product_images (
     image_id INT PRIMARY KEY NOT NULL AUTO_INCREMENT,
     product_id INT NOT NULL,
     img_path VARCHAR(255) NOT NULL,
-    uploaded_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (product_id) REFERENCES product (product_id) ON DELETE CASCADE
 );
 
--- how many pieces of each product are available
 CREATE TABLE stock (
     product_id INT PRIMARY KEY NOT NULL,
     quantity INT NOT NULL DEFAULT 0,
     FOREIGN KEY (product_id) REFERENCES product (product_id)
 );
 
--- shopping cart items
-CREATE TABLE cart (
-    cart_id INT PRIMARY KEY NOT NULL AUTO_INCREMENT,
-    user_id INT NOT NULL,
-    product_id INT NOT NULL,
-    quantity INT NOT NULL DEFAULT 1,
-    added_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE (user_id, product_id),
-    FOREIGN KEY (user_id) REFERENCES users (user_id),
-    FOREIGN KEY (product_id) REFERENCES product (product_id) ON DELETE CASCADE
-);
-
--- customer orders
--- status flow: pending -> processing -> shipped -> completed (or cancelled before shipping)
--- payment_method is a code from payment_methods() in includes/functions.php, e.g. 'cod'
+-- status: pending -> processing -> shipped -> completed, or cancelled
 CREATE TABLE orders (
     order_id INT PRIMARY KEY NOT NULL AUTO_INCREMENT,
     user_id INT NOT NULL,
-    total_amount DECIMAL(10,2) NOT NULL,
     status ENUM('pending', 'processing', 'shipped', 'completed', 'cancelled') NOT NULL DEFAULT 'pending',
-    shipping_address VARCHAR(255) NOT NULL,
-    payment_method VARCHAR(20) NOT NULL DEFAULT 'cod',
-    payment_status ENUM('unpaid', 'paid') NOT NULL DEFAULT 'unpaid',
-    paid_at DATETIME NULL,
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME NULL,
+    date_placed DATETIME NOT NULL,
     FOREIGN KEY (user_id) REFERENCES users (user_id)
 );
 
--- individual items in an order (snapshot of selling price and cost price at checkout)
+-- the products in each order. price is the selling price at the time of the order
 CREATE TABLE order_items (
     order_item_id INT PRIMARY KEY NOT NULL AUTO_INCREMENT,
     order_id INT NOT NULL,
     product_id INT NOT NULL,
     quantity INT NOT NULL,
     price DECIMAL(10,2) NOT NULL,
-    cost DECIMAL(10,2) NULL,
-    FOREIGN KEY (order_id) REFERENCES orders (order_id) ON DELETE CASCADE,
+    FOREIGN KEY (order_id) REFERENCES orders (order_id),
     FOREIGN KEY (product_id) REFERENCES product (product_id)
 );
 
--- every status change of an order: who changed it, when, and an optional note
-CREATE TABLE order_status_history (
-    history_id INT PRIMARY KEY NOT NULL AUTO_INCREMENT,
-    order_id INT NOT NULL,
-    status ENUM('pending', 'processing', 'shipped', 'completed', 'cancelled') NOT NULL,
-    note VARCHAR(255) NULL,
-    changed_by INT NULL,
-    changed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (order_id) REFERENCES orders (order_id) ON DELETE CASCADE,
-    FOREIGN KEY (changed_by) REFERENCES users (user_id)
-);
-
--- one row per "forgot password" request; only a hash of the emailed token is stored
-CREATE TABLE password_resets (
-    reset_id INT PRIMARY KEY NOT NULL AUTO_INCREMENT,
-    user_id INT NOT NULL,
-    token_hash CHAR(64) NOT NULL UNIQUE,
-    expires_at DATETIME NOT NULL,
-    used_at DATETIME NULL,
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users (user_id) ON DELETE CASCADE
-);
-
--- product reviews: one review per customer per product.
--- only a customer with a completed order of the product may write one (checked in PHP)
+-- one review per customer per product
 CREATE TABLE review (
     review_id INT PRIMARY KEY NOT NULL AUTO_INCREMENT,
     product_id INT NOT NULL,
     user_id INT NOT NULL,
-    rating TINYINT NOT NULL,
+    rating INT NOT NULL,
     comment VARCHAR(1000) NOT NULL,
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at DATETIME NOT NULL,
     updated_at DATETIME NULL,
     UNIQUE (product_id, user_id),
-    CHECK (rating BETWEEN 1 AND 5),
     FOREIGN KEY (product_id) REFERENCES product (product_id) ON DELETE CASCADE,
     FOREIGN KEY (user_id) REFERENCES users (user_id)
 );
 
--- the storefront filters and sorts by these
-CREATE INDEX idx_product_brand ON product (brand);
-CREATE INDEX idx_product_scent ON product (scent_type);
-CREATE INDEX idx_product_price ON product (sell_price);
+-- one row per product in an order: the customer, the order and the product, with its subtotal
+CREATE VIEW order_details_view AS
+SELECT o.order_id, o.user_id, u.name, u.email, c.addressline, c.town, c.zipcode, c.phone,
+       o.status, o.date_placed, p.product_id, p.name AS product_name, p.brand, p.size,
+       oi.quantity, oi.price, oi.quantity * oi.price AS subtotal
+FROM orders o
+INNER JOIN users u ON u.user_id = o.user_id
+LEFT JOIN customer c ON c.user_id = o.user_id
+INNER JOIN order_items oi ON oi.order_id = o.order_id
+INNER JOIN product p ON p.product_id = oi.product_id;
 
--- categories
+-- one row per order, with its grand total
+CREATE VIEW order_totals_view AS
+SELECT o.order_id, o.user_id, u.name, u.email, o.status, o.date_placed,
+       SUM(oi.quantity) AS items, SUM(oi.quantity * oi.price) AS total
+FROM orders o
+INNER JOIN users u ON u.user_id = o.user_id
+INNER JOIN order_items oi ON oi.order_id = o.order_id
+GROUP BY o.order_id, o.user_id, u.name, u.email, o.status, o.date_placed;
+
+INSERT INTO users (user_id, name, email, password, role, status, created_at) VALUES
+(1, 'Store Admin', 'admin@veloura.test', '$2y$10$SjZh2EyG8FJAFWVTnCOFlucQPci7cYpqx.urgWtL.Xv2IaZwH7mi2', 'admin', 'active', NOW()),
+(2, 'Juan Dela Cruz', 'customer@veloura.test', '$2y$10$/uZECPDeaLq1aZg/YIOSjOg72Ypl.BC2TRcPlPTaC3jpcaoBlYm/a', 'customer', 'active', NOW());
+
+INSERT INTO customer (user_id, addressline, town, zipcode, phone) VALUES
+(2, '123 Rizal St., Brgy. San Antonio', 'Pasig City', '1600', '09171234567');
+
 INSERT INTO category (category_id, name) VALUES
 (1, 'Perfumes'),
 (2, 'Perfume Oils'),
-(3, 'Fragrance Oils'),
-(4, 'Scented Candles'),
-(5, 'Reed Diffusers'),
-(6, 'Aroma Diffusers'),
-(7, 'Room Sprays'),
-(8, 'Linen Sprays'),
-(9, 'Wax Melts'),
-(10, 'Car Fragrances'),
-(11, 'Essential Oils'),
-(12, 'Other Fragrance Products');
+(3, 'Scented Candles'),
+(4, 'Reed Diffusers'),
+(5, 'Aroma Diffusers'),
+(6, 'Room Sprays'),
+(7, 'Wax Melts'),
+(8, 'Car Fragrances'),
+(9, 'Essential Oils');
 
 -- sample products (photos are in product/images, see product/images/CREDITS.txt)
-INSERT INTO product (product_id, category_id, name, brand, scent_type, size, unit, description, cost_price, sell_price, img_path) VALUES
-(1, 1, 'No. 5 Eau de Parfum', 'Chanel', 'Floral', 100, 'ml', 'Classic aldehydic floral with rose and jasmine.', 7200.00, 9950.00, 'images/sample_chanel_no5.jpg'),
-(2, 1, 'Sauvage', 'Dior', 'Fresh', 100, 'ml', 'Fresh and spicy scent with bergamot and pepper.', 5300.00, 7450.00, 'images/sample_dior_sauvage.jpg'),
-(3, 1, 'Acqua di Giò', 'Giorgio Armani', 'Aquatic', 100, 'ml', 'Light marine scent with citrus notes.', 4400.00, 6300.00, 'images/sample_acqua_di_gio.jpg'),
-(4, 1, '1 Million', 'Paco Rabanne', 'Spicy', 100, 'ml', 'Warm spicy scent with cinnamon and leather.', 3900.00, 5600.00, 'images/sample_1_million.jpg'),
-(5, 1, 'Eros', 'Versace', 'Fresh', 100, 'ml', 'Mint, green apple and vanilla.', 3400.00, 4950.00, 'images/sample_versace_eros.jpg'),
-(6, 1, 'Coco Mademoiselle', 'Chanel', 'Floral', 100, 'ml', 'Fresh oriental floral with orange and patchouli.', 6900.00, 9450.00, 'images/sample_coco_mademoiselle.jpg'),
-(7, 1, 'Le Male', 'Jean Paul Gaultier', 'Oriental', 125, 'ml', 'Lavender, mint and vanilla.', 3600.00, 5200.00, 'images/sample_le_male.jpg'),
-(8, 2, 'Oud Attar Roll-On Oil', 'Aroma House', 'Woody', 6, 'ml', 'Alcohol-free concentrated perfume oil in a roll-on bottle.', 120.00, 249.00, 'images/sample_attar_oil.jpg'),
-(9, 4, 'Mahogany Teakwood Scented Candle', 'White Barn', 'Woody', 200, 'g', 'Glass jar candle with warm woody notes, burn time about 45 hours.', 650.00, 1150.00, 'images/sample_scented_candle.jpg'),
-(10, 5, 'Lavender Reed Diffuser', 'Aroma House', 'Herbal', 100, 'ml', 'Lavender oil with natural reed sticks, lasts up to 2 months.', 280.00, 499.00, 'images/sample_reed_diffuser.jpg'),
-(11, 6, 'Ultrasonic Aroma Diffuser', 'Aroma House', 'Fresh', 1, 'pcs', '100 ml water tank with color-changing light. Use with essential oils.', 550.00, 999.00, 'images/sample_aroma_diffuser.jpg'),
-(12, 7, 'Freshmatic Automatic Room Spray', 'Air Wick', 'Floral', 250, 'ml', 'Automatic spray dispenser with refill can.', 420.00, 699.00, 'images/sample_room_spray.jpg'),
-(13, 9, 'Vanilla & Spiced Apple Wax Melts', 'Aroma House', 'Gourmand', 80, 'g', 'Soy wax melts for use with a wax warmer.', 120.00, 199.00, 'images/sample_wax_melts.jpg'),
-(14, 10, 'Strawberry Hanging Car Fragrance', 'Aroma House', 'Fruity', 8, 'ml', 'Hanging glass bottle with wooden cap, lasts about 30 days.', 60.00, 129.00, 'images/sample_car_fragrance.jpg'),
-(15, 11, 'Essential Oil Starter Set', 'Young Living', 'Herbal', 11, 'pcs', 'Set of 11 x 5 ml oils including lavender, peppermint and lemon.', 2200.00, 3499.00, 'images/sample_essential_oils.jpg');
+INSERT INTO product (product_id, category_id, name, brand, size, description, cost_price, sell_price, img_path) VALUES
+(1, 1, 'No. 5 Eau de Parfum', 'Chanel', '100 ml', 'Classic floral with rose and jasmine.', 7200.00, 9950.00, 'images/sample_chanel_no5.jpg'),
+(2, 1, 'Sauvage', 'Dior', '100 ml', 'Fresh and spicy scent with bergamot and pepper.', 5300.00, 7450.00, 'images/sample_dior_sauvage.jpg'),
+(3, 1, 'Acqua di Gio', 'Giorgio Armani', '100 ml', 'Light marine scent with citrus notes.', 4400.00, 6300.00, 'images/sample_acqua_di_gio.jpg'),
+(4, 1, '1 Million', 'Paco Rabanne', '100 ml', 'Warm spicy scent with cinnamon and leather.', 3900.00, 5600.00, 'images/sample_1_million.jpg'),
+(5, 1, 'Eros', 'Versace', '100 ml', 'Mint, green apple and vanilla.', 3400.00, 4950.00, 'images/sample_versace_eros.jpg'),
+(6, 1, 'Coco Mademoiselle', 'Chanel', '100 ml', 'Fresh floral with orange and patchouli.', 6900.00, 9450.00, 'images/sample_coco_mademoiselle.jpg'),
+(7, 1, 'Le Male', 'Jean Paul Gaultier', '125 ml', 'Lavender, mint and vanilla.', 3600.00, 5200.00, 'images/sample_le_male.jpg'),
+(8, 2, 'Oud Attar Roll-On Oil', 'Aroma House', '6 ml', 'Alcohol-free perfume oil in a roll-on bottle.', 120.00, 249.00, 'images/sample_attar_oil.jpg'),
+(9, 3, 'Mahogany Teakwood Candle', 'White Barn', '200 g', 'Glass jar candle with warm woody notes.', 650.00, 1150.00, 'images/sample_scented_candle.jpg'),
+(10, 4, 'Lavender Reed Diffuser', 'Aroma House', '100 ml', 'Lavender oil with reed sticks, lasts up to 2 months.', 280.00, 499.00, 'images/sample_reed_diffuser.jpg'),
+(11, 5, 'Ultrasonic Aroma Diffuser', 'Aroma House', '1 pc', '100 ml water tank with color-changing light.', 550.00, 999.00, 'images/sample_aroma_diffuser.jpg'),
+(12, 6, 'Freshmatic Room Spray', 'Air Wick', '250 ml', 'Automatic spray dispenser with refill can.', 420.00, 699.00, 'images/sample_room_spray.jpg'),
+(13, 7, 'Vanilla & Spiced Apple Wax Melts', 'Aroma House', '80 g', 'Soy wax melts for use with a wax warmer.', 120.00, 199.00, 'images/sample_wax_melts.jpg'),
+(14, 8, 'Strawberry Car Fragrance', 'Aroma House', '8 ml', 'Hanging glass bottle, lasts about 30 days.', 60.00, 129.00, 'images/sample_car_fragrance.jpg'),
+(15, 9, 'Essential Oil Starter Set', 'Young Living', '11 pcs', 'Set of 11 x 5 ml oils including lavender and lemon.', 2200.00, 3499.00, 'images/sample_essential_oils.jpg');
 
 INSERT INTO stock (product_id, quantity) VALUES
-(1, 10),
-(2, 15),
-(3, 12),
-(4, 20),
-(5, 18),
-(6, 8),
-(7, 3),
-(8, 30),
-(9, 12),
-(10, 20),
-(11, 6),
-(12, 14),
-(13, 40),
-(14, 50),
-(15, 5);
+(1, 10), (2, 15), (3, 12), (4, 20), (5, 18), (6, 8), (7, 3), (8, 30),
+(9, 12), (10, 20), (11, 6), (12, 14), (13, 40), (14, 50), (15, 5);

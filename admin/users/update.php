@@ -1,103 +1,85 @@
 <?php
 session_start();
 include('../../includes/config.php');
-include('../../includes/functions.php');
+include('../../includes/adminCheck.php');
 
-// User CRUD (update): admins only
-require_admin();
-
-if (!isset($_POST['submit'])) {
-    header("Location: index.php");
-    exit();
-}
-
-$user_id = filter_input(INPUT_POST, 'user_id', FILTER_VALIDATE_INT);
-$user = $user_id ? mysqli_fetch_assoc(mysqli_execute_query($conn,
-    "SELECT user_id, name, img_path, role, status FROM users WHERE user_id = ? LIMIT 1", [$user_id])) : null;
-if (!$user) {
-    $_SESSION['message'] = 'User not found.';
-    header("Location: index.php");
-    exit();
-}
+$user_id = (int)$_POST['user_id'];
+$name = trim(strip_tags($_POST['name']));
+$email = trim($_POST['email']);
 $back = "edit.php?id={$user_id}";
 
-if (!csrf_valid()) {
-    $_SESSION['message'] = 'Your session expired. Please try again.';
-    header("Location: {$back}");
+$sql = "SELECT role, status, img_path FROM users WHERE user_id = ? LIMIT 1";
+$user = mysqli_fetch_assoc(mysqli_execute_query($conn, $sql, [$user_id]));
+if (!$user) {
+    $_SESSION['message'] = 'user not found';
+    header("Location: index.php");
     exit();
 }
 
-$name = strip_tags(post_value('name'));
-$email = post_value('email');
 // a disabled role list is not sent, so keep the current role then
-$role = isset($_POST['role']) ? post_value('role') : $user['role'];
-$removePhoto = post_value('remove_photo') === '1';
-$photo = isset($_FILES['photo']) ? $_FILES['photo'] : null;
-$isMe = (int)$user_id === (int)$_SESSION['user_id'];
-
-// validation
-$errors = user_field_errors($conn, $name, $email, $user_id);
-if (!in_array($role, array('customer', 'admin'), true)) {
-    $errors['role'] = 'Please choose a role.';
-} else if ($role !== $user['role']) {
-    // the role of an active user only, and never your own
-    if ($isMe) {
-        $errors['role'] = 'You cannot change your own role.';
-    } else if ($user['status'] !== 'active') {
-        $errors['role'] = 'Only an active user\'s role can be changed. Activate this user first.';
-    }
-}
-$photoError = photo_upload_error($photo, false);
-if ($photoError !== '') {
-    $errors['photo'] = $photoError;
+$role = $user['role'];
+if (isset($_POST['role'])) {
+    $role = $_POST['role'];
 }
 
-if ($errors) {
-    keep_form('user_edit_' . $user_id, $errors, array('name' => $name, 'email' => $email, 'role' => $role));
+//validation
+if ($name === '') {
+    $_SESSION['message'] = 'please enter the name';
+    header("Location: {$back}");
+    exit();
+} else if (!preg_match("/^[\w.+-]+@\w+(\.\w+)+$/", $email)) {
+    $_SESSION['message'] = 'email invalid format';
+    header("Location: {$back}");
+    exit();
+} else if ($role !== 'customer' && $role !== 'admin') {
+    $_SESSION['message'] = 'please choose a role';
+    header("Location: {$back}");
+    exit();
+} else if ($role !== $user['role'] && $user['status'] !== 'active') {
+    $_SESSION['message'] = 'only an active user\'s role can be changed';
+    header("Location: {$back}");
+    exit();
+} else if ($role !== $user['role'] && $user_id == $_SESSION['user_id']) {
+    $_SESSION['message'] = 'you cannot change your own role';
     header("Location: {$back}");
     exit();
 }
 
-// photo: a new one replaces the old one; "remove" clears it
-$imgPath = $user['img_path'];
-$newPhoto = false;
-if (is_array($photo) && $photo['error'] === UPLOAD_ERR_OK) {
-    $fileName = save_photo($photo, app_file('user/images'));
-    if ($fileName === '') {
-        keep_form('user_edit_' . $user_id, array('photo' => 'The photo could not be saved. Please try again.'),
-            array('name' => $name, 'email' => $email, 'role' => $role));
+$result = mysqli_execute_query($conn, "SELECT user_id FROM users WHERE email = ? AND user_id <> ? LIMIT 1", [$email, $user_id]);
+if (mysqli_num_rows($result) > 0) {
+    $_SESSION['message'] = 'this email is already used by another user';
+    header("Location: {$back}");
+    exit();
+}
+
+// a new photo is optional
+$target = $user['img_path'];
+if (isset($_FILES['photo']) && $_FILES['photo']['error'] !== UPLOAD_ERR_NO_FILE) {
+    if ($_FILES['photo']['type'] == "image/jpeg" || $_FILES['photo']['type'] == "image/jpg" || $_FILES['photo']['type'] == "image/png") {
+        $source = $_FILES['photo']['tmp_name'];
+        $target = 'images/' . time() . '_' . $_FILES['photo']['name'];
+        move_uploaded_file($source, '../../user/' . $target) or die("Couldn't copy");
+    } else {
+        $_SESSION['message'] = 'wrong file type, please use JPG or PNG';
         header("Location: {$back}");
         exit();
     }
-    $imgPath = 'user/images/' . $fileName;
-    $newPhoto = true;
-} else if ($removePhoto) {
-    $imgPath = null;
 }
 
 try {
     $sql = "UPDATE users SET name = ?, email = ?, role = ?, img_path = ? WHERE user_id = ?";
     $stmt = mysqli_prepare($conn, $sql);
-    mysqli_stmt_bind_param($stmt, 'ssssi', $name, $email, $role, $imgPath, $user_id);
+    mysqli_stmt_bind_param($stmt, 'ssssi', $name, $email, $role, $target, $user_id);
     mysqli_stmt_execute($stmt);
-} catch (mysqli_sql_exception $e) {
-    if ($newPhoto) {
-        delete_photo_file(app_file($imgPath));
+
+    // the admin edited their own account
+    if ($user_id == $_SESSION['user_id']) {
+        $_SESSION['email'] = $email;
+        $_SESSION['photo'] = $target;
     }
-    $_SESSION['message'] = 'Could not save the changes. Please try again.';
+    $_SESSION['success'] = 'user updated';
+    header("Location: index.php");
+} catch (mysqli_sql_exception $e) {
+    $_SESSION['message'] = 'could not update the user';
     header("Location: {$back}");
-    exit();
 }
-
-// the old photo file is not needed anymore
-if ($user['img_path'] && $imgPath !== $user['img_path']) {
-    delete_photo_file(app_file($user['img_path']));
-}
-
-$text = 'Changes to ' . e($name) . ' were saved.';
-if ($role !== $user['role']) {
-    $text .= ' Their role is now <strong>' . e(ucfirst($role)) . '</strong>.';
-}
-$_SESSION['success'] = $text;
-header("Location: {$back}");
-exit();

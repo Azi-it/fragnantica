@@ -1,33 +1,29 @@
 <?php
 session_start();
 include('../includes/config.php');
-include('../includes/functions.php');
+include('../includes/adminCheck.php');
 
-// only admins can edit products
-require_admin();
-
-if (isset($_POST['submit'])) {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit'])) {
     $product_id = (int)$_POST['product_id'];
     $name = trim(strip_tags($_POST['name']));
-    $categoryInput = trim($_POST['category_id']);
+    $category_id = trim($_POST['category_id']);
     $brand = trim(strip_tags($_POST['brand']));
-    $scent = trim($_POST['scent_type']);
-    $sizeInput = trim($_POST['size']);
-    $unit = trim($_POST['unit']);
-    $description = trim(strip_tags($_POST['description']));
+    $size = trim(strip_tags($_POST['size']));
+    $desc = trim(strip_tags($_POST['description']));
     $costInput = trim($_POST['cost_price']);
     $sellInput = trim($_POST['sell_price']);
     $qtyInput = trim($_POST['quantity']);
     $hasErrors = false;
 
-    $units = array('ml', 'g', 'pcs');
-
-    //validation
+    // validation (PHP only, the form has novalidate)
     if ($name === '') {
         $_SESSION['nameError'] = 'Please input the product name';
         $hasErrors = true;
+    } else if (strlen($name) > 100) {
+        $_SESSION['nameError'] = 'The product name should be 100 characters or less';
+        $hasErrors = true;
     }
-    if ($categoryInput === '' || filter_var($categoryInput, FILTER_VALIDATE_INT) === false) {
+    if ($category_id === '' || !is_numeric($category_id)) {
         $_SESSION['categoryError'] = 'Please choose a category';
         $hasErrors = true;
     }
@@ -35,19 +31,15 @@ if (isset($_POST['submit'])) {
         $_SESSION['brandError'] = 'Please input the brand';
         $hasErrors = true;
     }
-    if ($scent === '') {
-        $_SESSION['scentError'] = 'Please choose a scent type';
+    if ($size === '') {
+        $_SESSION['sizeError'] = 'Please input the size, e.g. 100 ml';
         $hasErrors = true;
     }
-    if ($sizeInput === '' || filter_var($sizeInput, FILTER_VALIDATE_INT) === false || (int)$sizeInput <= 0) {
-        $_SESSION['sizeError'] = 'Please enter a valid size';
+    if ($desc === '') {
+        $_SESSION['descError'] = 'Please input a product description';
         $hasErrors = true;
-    } else if (!in_array($unit, $units)) {
-        $_SESSION['sizeError'] = 'Please choose a unit';
-        $hasErrors = true;
-    }
-    if (strlen($description) > 255) {
-        $_SESSION['descError'] = 'Description should be 255 characters or less';
+    } else if (strlen($desc) > 255) {
+        $_SESSION['descError'] = 'The description should be 255 characters or less';
         $hasErrors = true;
     }
     if ($costInput === '' || !is_numeric($costInput) || $costInput <= 0) {
@@ -55,65 +47,40 @@ if (isset($_POST['submit'])) {
         $hasErrors = true;
     }
     if ($sellInput === '' || !is_numeric($sellInput) || $sellInput <= 0) {
-        $_SESSION['sellError'] = 'Please enter a valid selling price';
+        $_SESSION['sellError'] = 'Please enter a valid sell price';
+        $hasErrors = true;
+    } else if (is_numeric($costInput) && $sellInput < $costInput) {
+        $_SESSION['sellError'] = 'The sell price should not be lower than the cost price';
         $hasErrors = true;
     }
     if ($qtyInput === '' || filter_var($qtyInput, FILTER_VALIDATE_INT) === false || (int)$qtyInput < 0) {
-        $_SESSION['qtyError'] = 'Please enter a valid stock quantity';
+        $_SESSION['qtyError'] = 'Please enter a valid quantity';
         $hasErrors = true;
     }
 
-    // a new main photo is optional, so only check it if one was chosen
-    $mainPhoto = isset($_FILES['img_path']) ? $_FILES['img_path'] : null;
-    $photoError = photo_upload_error($mainPhoto, false);
-    if ($photoError !== '') {
-        $_SESSION['imageError'] = $photoError;
+    // a new main photo is optional
+    $newPhoto = isset($_FILES['img_path']) && $_FILES['img_path']['error'] !== UPLOAD_ERR_NO_FILE;
+    if ($newPhoto && $_FILES['img_path']['type'] != "image/jpeg" && $_FILES['img_path']['type'] != "image/jpg" && $_FILES['img_path']['type'] != "image/png") {
+        $_SESSION['imageError'] = 'wrong file type, please use JPG or PNG';
         $hasErrors = true;
     }
-    $newMain = $photoError === '' && is_array($mainPhoto) && $mainPhoto['error'] === UPLOAD_ERR_OK;
 
-    // MP1: the extra photos this product has now, and the ones ticked for removal
-    $sql = "SELECT image_id, img_path FROM product_images WHERE product_id = ?";
-    $currentExtras = mysqli_fetch_all(mysqli_execute_query($conn, $sql, [$product_id]), MYSQLI_ASSOC);
-    $removeIds = array();
-    $removeFiles = array();
-    $ticked = isset($_POST['delete_photos']) && is_array($_POST['delete_photos']) ? $_POST['delete_photos'] : array();
-    foreach ($currentExtras as $photo) {
-        // only this product's own photos can be removed
-        if (in_array((string)$photo['image_id'], $ticked, true)) {
-            $removeIds[] = (int)$photo['image_id'];
-            $removeFiles[] = $photo['img_path'];
-        }
-    }
-
-    // MP1: new extra photos, as long as the product stays within the limit
-    $newExtras = uploaded_files_list(isset($_FILES['photos']) ? $_FILES['photos'] : null);
-    $slotsLeft = MAX_PRODUCT_PHOTOS - count($currentExtras) + count($removeIds);
-    if (count($newExtras) > $slotsLeft) {
-        $_SESSION['photosError'] = $slotsLeft > 0
-            ? "You can add {$slotsLeft} more photo" . ($slotsLeft === 1 ? '' : 's') . ' (up to ' . MAX_PRODUCT_PHOTOS . ' per product).'
-            : 'This product already has ' . MAX_PRODUCT_PHOTOS . ' extra photos. Remove some first.';
-        $hasErrors = true;
-    } else {
-        foreach ($newExtras as $file) {
-            $error = photo_upload_error($file, true);
-            if ($error !== '') {
-                $_SESSION['photosError'] = $file['name'] . ': ' . $error;
+    // more photos are optional, but they must be JPG or PNG
+    if (isset($_FILES['photos']) && $_FILES['photos']['name'][0] !== '') {
+        foreach ($_FILES['photos']['type'] as $key => $type) {
+            if ($type != "image/jpeg" && $type != "image/jpg" && $type != "image/png") {
+                $_SESSION['photosError'] = "wrong file type: {$_FILES['photos']['name'][$key]}, please use JPG or PNG";
                 $hasErrors = true;
-                break;
             }
         }
     }
 
     if ($hasErrors) {
-        // keep what the admin typed so the form can be filled again
-        $_SESSION['productName'] = $name;
-        $_SESSION['categoryId'] = $categoryInput;
+        $_SESSION['prodName'] = $name;
+        $_SESSION['category'] = $category_id;
         $_SESSION['brand'] = $brand;
-        $_SESSION['scent'] = $scent;
-        $_SESSION['size'] = $sizeInput;
-        $_SESSION['unit'] = $unit;
-        $_SESSION['description'] = $description;
+        $_SESSION['size'] = $size;
+        $_SESSION['desc'] = $desc;
         $_SESSION['cost'] = $costInput;
         $_SESSION['sell'] = $sellInput;
         $_SESSION['qty'] = $qtyInput;
@@ -121,87 +88,62 @@ if (isset($_POST['submit'])) {
         exit();
     }
 
-    // get the current main photo so it can be kept or replaced
-    $sql = "SELECT img_path FROM product WHERE product_id = ? LIMIT 1";
-    $row = mysqli_fetch_assoc(mysqli_execute_query($conn, $sql, [$product_id]));
-
-    if (!$row) {
-        $_SESSION['message'] = 'product not found';
-        header("Location: index.php");
-        exit();
-    }
-    $oldPhoto = $row['img_path'];
-
-    // save the new photo files first, each with a new random name
-    $saved = array();
-    $toSave = $newMain ? array_merge(array($mainPhoto), $newExtras) : $newExtras;
-    foreach ($toSave as $file) {
-        $fileName = save_photo($file, __DIR__ . '/images');
-        if ($fileName === '') {
-            foreach ($saved as $path) {
-                delete_photo_file(__DIR__ . '/' . $path);
-            }
-            $_SESSION['message'] = 'The photos could not be saved. Please try again.';
-            header("Location: edit.php?id={$product_id}");
-            exit();
-        }
-        $saved[] = 'images/' . $fileName;
-    }
-    $target = $newMain ? $saved[0] : $oldPhoto;
-    $extraPaths = $newMain ? array_slice($saved, 1) : $saved;
-
-    $category_id = (int)$categoryInput;
-    $size = (int)$sizeInput;
     $cost = (float)$costInput;
     $sell = (float)$sellInput;
     $qty = (int)$qtyInput;
+    $category_id = (int)$category_id;
 
-    // update the product, its stock and its photos together
     mysqli_begin_transaction($conn);
-
     try {
-        $sql = "UPDATE product SET category_id=?, name=?, brand=?, scent_type=?, size=?, unit=?, description=?, cost_price=?, sell_price=?, img_path=? WHERE product_id=?";
-        $stmt1 = mysqli_prepare($conn, $sql);
-        mysqli_stmt_bind_param($stmt1, 'isssissddsi', $category_id, $name, $brand, $scent, $size, $unit, $description, $cost, $sell, $target, $product_id);
+        if ($newPhoto) {
+            $source = $_FILES['img_path']['tmp_name'];
+            $target = 'images/' . time() . '_' . $_FILES['img_path']['name'];
+            move_uploaded_file($source, $target) or die("Couldn't copy");
+
+            $sql = "UPDATE product SET category_id = ?, name = ?, brand = ?, size = ?, description = ?, cost_price = ?, sell_price = ?, img_path = ? WHERE product_id = ?";
+            $stmt1 = mysqli_prepare($conn, $sql);
+            mysqli_stmt_bind_param($stmt1, 'issssddsi', $category_id, $name, $brand, $size, $desc, $cost, $sell, $target, $product_id);
+        } else {
+            // keep the old main photo
+            $sql = "UPDATE product SET category_id = ?, name = ?, brand = ?, size = ?, description = ?, cost_price = ?, sell_price = ? WHERE product_id = ?";
+            $stmt1 = mysqli_prepare($conn, $sql);
+            mysqli_stmt_bind_param($stmt1, 'issssddi', $category_id, $name, $brand, $size, $desc, $cost, $sell, $product_id);
+        }
         mysqli_stmt_execute($stmt1);
 
-        $sql = "UPDATE stock SET quantity=? WHERE product_id=?";
+        $sql = "UPDATE stock SET quantity = ? WHERE product_id = ?";
         $stmt2 = mysqli_prepare($conn, $sql);
         mysqli_stmt_bind_param($stmt2, 'ii', $qty, $product_id);
         mysqli_stmt_execute($stmt2);
 
-        // MP1: remove the ticked photos and add the new ones
-        foreach ($removeIds as $image_id) {
-            mysqli_execute_query($conn, "DELETE FROM product_images WHERE image_id = ? AND product_id = ?", [$image_id, $product_id]);
+        // remove the ticked photos
+        if (isset($_POST['delete_photos']) && is_array($_POST['delete_photos'])) {
+            foreach ($_POST['delete_photos'] as $image_id) {
+                mysqli_execute_query($conn, "DELETE FROM product_images WHERE image_id = ? AND product_id = ?", [$image_id, $product_id]);
+            }
         }
-        foreach ($extraPaths as $path) {
-            mysqli_execute_query($conn, "INSERT INTO product_images (product_id, img_path) VALUES (?, ?)", [$product_id, $path]);
+
+        // save the new photos
+        if (isset($_FILES['photos']) && $_FILES['photos']['name'][0] !== '') {
+            $sql = "INSERT INTO product_images (product_id, img_path) VALUES (?, ?)";
+            $stmt3 = mysqli_prepare($conn, $sql);
+            foreach ($_FILES['photos']['name'] as $key => $photoName) {
+                $photo = 'images/' . time() . '_' . $photoName;
+                move_uploaded_file($_FILES['photos']['tmp_name'][$key], $photo);
+                mysqli_stmt_bind_param($stmt3, 'is', $product_id, $photo);
+                mysqli_stmt_execute($stmt3);
+            }
         }
 
         mysqli_commit($conn);
+        $_SESSION['success'] = 'product updated';
+        header("Location: index.php");
+        exit();
     } catch (mysqli_sql_exception $e) {
         mysqli_rollback($conn);
-        // nothing changed, so the new photo files are not needed
-        foreach ($saved as $path) {
-            delete_photo_file(__DIR__ . '/' . $path);
-        }
-        $_SESSION['message'] = 'Could not update the product: ' . $e->getMessage();
+        $_SESSION['message'] = 'could not update the product';
         header("Location: edit.php?id={$product_id}");
         exit();
     }
-
-    // the replaced and removed photo files are not needed anymore
-    if ($newMain) {
-        delete_photo_file(__DIR__ . '/' . $oldPhoto);
-    }
-    foreach ($removeFiles as $path) {
-        delete_photo_file(__DIR__ . '/' . $path);
-    }
-
-    $_SESSION['success'] = 'Product updated successfully';
-    header("Location: index.php");
-    exit();
 }
-
 header("Location: index.php");
-exit();

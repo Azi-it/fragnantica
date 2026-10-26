@@ -13,13 +13,13 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"
         integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous">
     </script>
-    <title>Fragrance &amp; Scent Store</title>
+    <title>Veloura</title>
 </head>
 
 <body>
     <nav class="navbar navbar-expand-lg bg-body-tertiary">
         <div class="container-fluid">
-            <a class="navbar-brand" href="/Fragnantica/index.php">Fragrance &amp; Scent Store</a>
+            <a class="navbar-brand" href="/Fragnantica/index.php">Veloura</a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
                 data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false"
                 aria-label="Toggle navigation">
@@ -31,28 +31,22 @@
                         <a class="nav-link" href="/Fragnantica/index.php">Home</a>
                     </li>
                     <?php
-                    // admin-only links
                     if (isset($_SESSION['role']) && $_SESSION['role'] === 'admin') {
-                        echo '<li class="nav-item"><a class="nav-link" href="/Fragnantica/admin/index.php"><i class="fa-solid fa-chart-line"></i> Dashboard</a></li>';
                         echo '<li class="nav-item"><a class="nav-link" href="/Fragnantica/product/index.php">Products</a></li>';
-                        echo '<li class="nav-item"><a class="nav-link" href="/Fragnantica/product/create.php">Add Product</a></li>';
-                        echo '<li class="nav-item"><a class="nav-link" href="/Fragnantica/order/index.php"><i class="fa-solid fa-receipt"></i> Orders</a></li>';
-                        echo '<li class="nav-item"><a class="nav-link" href="/Fragnantica/admin/users/index.php"><i class="fa-solid fa-users"></i> Users</a></li>';
+                        echo '<li class="nav-item"><a class="nav-link" href="/Fragnantica/admin/orders.php">Orders</a></li>';
+                        echo '<li class="nav-item"><a class="nav-link" href="/Fragnantica/admin/users/index.php">Users</a></li>';
                     }
 
-                    // links for any logged in user
                     if (isset($_SESSION['user_id'])) {
+                        echo '<li class="nav-item"><a class="nav-link" href="/Fragnantica/cart/view_cart.php"><i class="fa-solid fa-cart-shopping"></i> Cart</a></li>';
+                        echo '<li class="nav-item"><a class="nav-link" href="/Fragnantica/user/myorders.php">My Orders</a></li>';
                         echo '<li class="nav-item"><a class="nav-link" href="/Fragnantica/user/profile.php">My Profile</a></li>';
-                    }
-
-                    if (isset($_SESSION['role']) && $_SESSION['role'] === 'customer') {
-                        echo '<li class="nav-item"><a class="nav-link" href="/Fragnantica/cart/index.php"><i class="fa-solid fa-cart-shopping"></i> Cart</a></li>';
                     }
                     ?>
                 </ul>
-                <form action="/Fragnantica/index.php" method="GET" class="d-flex" role="search">
-                    <input class="form-control me-2" type="search" placeholder="Search products" aria-label="Search"
-                        name="search" value="<?php if (isset($_GET['search'])) echo htmlentities($_GET['search']); ?>">
+                <form action="/Fragnantica/index.php" method="GET" class="d-flex">
+                    <input class="form-control me-2" type="search" placeholder="Search" aria-label="Search"
+                        name="search">
                     <button class="btn btn-outline-success" type="submit">Search</button>
                 </form>
                 <?php
@@ -61,21 +55,15 @@
                         <a href='/Fragnantica/user/login.php' class='nav-item nav-link'>Login</a>
                         <a href='/Fragnantica/user/register.php' class='nav-item nav-link'>Register</a></div>";
                 } else {
-                    // MP2: the user's photo (or their initials) next to their name
-                    $navName = htmlspecialchars($_SESSION['name'], ENT_QUOTES, 'UTF-8');
-                    $navPhoto = function_exists('avatar') ? avatar($_SESSION['name'], $_SESSION['photo'] ?? null, 28) : "<i class='fa-solid fa-user'></i>";
+                    $photo = "<i class='fa-solid fa-user'></i>";
+                    if (!empty($_SESSION['photo'])) {
+                        $photo = "<img src='/Fragnantica/user/{$_SESSION['photo']}' class='nav-photo'>";
+                    }
                     echo "<div class='navbar-nav ms-auto align-items-lg-center'>
-                        <a href='/Fragnantica/user/profile.php' class='nav-item nav-link d-flex align-items-center gap-2'>{$navPhoto} {$navName}</a>
+                        <span class='nav-item nav-link'>{$photo} {$_SESSION['email']}</span>
                         <a href='/Fragnantica/user/logout.php' class='nav-item nav-link'>Logout</a></div>";
                 }
                 ?>
             </div>
         </div>
     </nav>
-    <?php if (!empty($_SESSION['default_password'])): ?>
-        <div class="alert alert-danger rounded-0 mb-0 text-center py-2" role="alert">
-            <i class="fa-solid fa-triangle-exclamation me-1"></i>
-            <strong>Your admin password is the published default.</strong> Anyone could log in as you.
-            <a href="/Fragnantica/user/profile.php" class="alert-link">Change it now</a>.
-        </div>
-    <?php endif; ?>
