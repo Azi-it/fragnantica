@@ -2,41 +2,6 @@ Photo credits for the sample products
 All photos are from Wikimedia Commons (https://commons.wikimedia.org).
 Some were downloaded as smaller 500px versions of the original.
 
-sample_chanel_no5.jpg
-  Source:  https://commons.wikimedia.org/wiki/File:CHANEL_No5_parfum_(cropped).jpg
-  Author:  arz
-  License: Public domain
-
-sample_dior_sauvage.jpg
-  Source:  https://commons.wikimedia.org/wiki/File:Dior_Sauvage_Verpackung.jpg
-  Author:  DYVER
-  License: CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/)
-
-sample_acqua_di_gio.jpg
-  Source:  https://commons.wikimedia.org/wiki/File:Acqua_di_Gio.jpg
-  Author:  Gonna Fly Now
-  License: CC BY-SA 2.0 (https://creativecommons.org/licenses/by-sa/2.0/)
-
-sample_1_million.jpg
-  Source:  https://commons.wikimedia.org/wiki/File:2023_Woda_toaletowa_Paco_Rabanne_1_Million.jpg
-  Author:  Jacek Halicki
-  License: CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/)
-
-sample_versace_eros.jpg
-  Source:  https://commons.wikimedia.org/wiki/File:VersaceEros121.jpg
-  Author:  Benny191
-  License: CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/)
-
-sample_coco_mademoiselle.jpg
-  Source:  https://commons.wikimedia.org/wiki/File:Coco_mademoiselle.jpg
-  Author:  Brownchl
-  License: CC BY 3.0 (https://creativecommons.org/licenses/by/3.0/)
-
-sample_le_male.jpg
-  Source:  https://commons.wikimedia.org/wiki/File:Gaultier_Le_M%C3%A2le.jpg
-  Author:  Bruce The Deus
-  License: CC BY-SA 3.0 (https://creativecommons.org/licenses/by-sa/3.0/)
-
 sample_attar_oil.jpg
   Source:  https://commons.wikimedia.org/wiki/File:Minyak_atar_(attar)_yang_dijual_di_dataran_puncak_Jabal_Rahmah,_Mekah.jpg
   Author:  Kerina yin
@@ -76,3 +41,77 @@ sample_essential_oils.jpg
   Source:  https://commons.wikimedia.org/wiki/File:Essential_oil_kit.jpg
   Author:  Vanilla and lace
   License: CC BY 2.0 (https://creativecommons.org/licenses/by/2.0/)
+
+sample_vanilla_tin_candle.jpg
+  Source:  https://commons.wikimedia.org/wiki/File:Scented_candle_candlelight.jpg
+  Author:  Csiiiyu
+  License: CC0 (http://creativecommons.org/publicdomain/zero/1.0/deed.en)
+
+sample_pine_glass_candle.jpg
+  Source:  https://commons.wikimedia.org/wiki/File:Scented_candle.jpg
+  Author:  MichalPL
+  License: CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0)
+
+sample_white_linen_candle.jpg
+  Source:  https://commons.wikimedia.org/wiki/File:Candle_With_Gold_Stand.jpg
+  Author:  Amicageniale01
+  License: CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0)
+
+sample_beeswax_candles.jpg
+  Source:  https://commons.wikimedia.org/wiki/File:Scented_candles..._(8610155782).jpg
+  Author:  Newtown grafitti from Sydney, Australia
+  License: CC BY 2.0 (https://creativecommons.org/licenses/by/2.0)
+
+sample_ceramic_wax_warmer.jpg
+  Source:  https://commons.wikimedia.org/wiki/File:Duftlampe.jpg
+  Author:  Zeitlupe
+  License: CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0)
+
+sample_tealight_wax_warmer.jpg
+  Source:  https://commons.wikimedia.org/wiki/File:38930060_b6280d7e20.jpg
+  Author:  Uploaded by Eggybird
+  License: CC BY 2.0 (https://creativecommons.org/licenses/by/2.0)
+
+sample_tealight_oil_burner.jpg
+  Source:  https://commons.wikimedia.org/wiki/File:Aromatas.JPG
+  Author:  Original uploader was Hugo.arg at bat-smg.wikipedia
+  License: CC BY-SA 3.0 (http://creativecommons.org/licenses/by-sa/3.0/)
+
+sample_smart_diffuser.jpg
+  Source:  https://commons.wikimedia.org/wiki/File:2018-03-16_%E2%80%93_Internet_of_Things_%E2%80%94_wireless_parfum_diffuser.jpg
+  Author:  FaceMePLS
+  License: CC BY 2.0 (https://creativecommons.org/licenses/by/2.0)
+
+sample_spray_dispenser.jpg
+  Source:  https://commons.wikimedia.org/wiki/File:Automatic_Air_Freshner.jpg
+  Author:  Kskhh
+  License: CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0)
+
+sample_room_mist_trio.jpg
+  Source:  https://commons.wikimedia.org/wiki/File:Aura_soma_air_fresheners.JPG
+  Author:  Zeibura
+  License: CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0)
+
+sample_rosemary_oil.jpg
+  Source:  https://commons.wikimedia.org/wiki/File:Rosemary_Oil_in_a_bottle_and_rosemary_herb.jpg
+  Author:  formulatehealth
+  License: CC BY 2.0 (https://creativecommons.org/licenses/by/2.0)
+
+sample_perfume_oil_sampler.jpg
+  Source:  https://commons.wikimedia.org/wiki/File:Bottles_of_essential_oils_and_perfume.jpg
+  Author:  Christopher J. Fynn
+  License: CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0)
+
+sample_hanging_car_diffuser.jpg
+  Source:  https://commons.wikimedia.org/wiki/File:Car-bokeh-air-freshener_(23956581049).jpg
+  Author:  www.Pixel.la Free Stock Photos
+  License: CC0 (http://creativecommons.org/publicdomain/zero/1.0/deed.en)
+
+sample_ocean_gel_freshener.jpg
+  Source:  https://commons.wikimedia.org/wiki/File:Gel_fragrance.jpg
+  Author:  Ajmint
+  License: CC BY 3.0 (https://creativecommons.org/licenses/by/3.0)
+
+Homepage banner video (includes/video/hero.mp4)
+  "Candles in the dark" from Mixkit (https://mixkit.co/free-stock-video/candles-in-the-dark-17426/)
+  License: Mixkit Stock Video Free License (https://mixkit.co/license/)

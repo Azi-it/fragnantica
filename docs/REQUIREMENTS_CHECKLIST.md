@@ -2,7 +2,7 @@
 
 Where each requirement is in the project and how to show it.
 
-**Before the demo:** put the project folder in `C:\xampp\htdocs\Fragnantica`, import `database.sql`
+**Before the demo:** put the project folder in `C:\xampp\htdocs\Veloura` (open it at `http://localhost/Veloura`), import `database.sql`
 in phpMyAdmin, and set up Mailtrap (`docs/EMAIL_SETUP.md`).
 
 Accounts: admin `admin@veloura.test` / `admin123`, customer `customer@veloura.test` / `customer123`.

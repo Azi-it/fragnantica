@@ -6,6 +6,62 @@ h1, h2, h3 {
     font-family: Georgia, serif;
 }
 
+/* homepage banner with the looping video */
+.hero {
+    position: relative;
+    height: 380px;
+    overflow: hidden;
+    background-color: #1a120b;
+}
+
+.hero-video {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* dark layer over the video so the white text is easy to read */
+.hero::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.45);
+}
+
+.hero-content {
+    position: relative;
+    z-index: 1;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    text-align: center;
+    color: #fff;
+    padding: 0 15px;
+}
+
+.hero-content h1 {
+    font-size: 3rem;
+}
+
+.hero-content p {
+    font-size: 1.2rem;
+    margin-bottom: 25px;
+}
+
+/* people who turned off animations in their system settings see a still banner */
+@media (prefers-reduced-motion: reduce) {
+    .hero-video {
+        display: none;
+    }
+}
+
 ul.products {
     list-style: none;
     padding: 0;

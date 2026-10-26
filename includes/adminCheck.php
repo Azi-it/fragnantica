@@ -4,13 +4,13 @@
 // not logged in: go to the login page
 if (!isset($_SESSION['user_id'])) {
     $_SESSION['message'] = 'Please login first to access that page';
-    header("Location: /Fragnantica/user/login.php");
+    header("Location: /Veloura/user/login.php");
     exit();
 }
 
 // logged in but not an admin: go back to the home page
 if ($_SESSION['role'] !== 'admin') {
     $_SESSION['message'] = 'Only administrators can access that page';
-    header("Location: /Fragnantica/index.php");
+    header("Location: /Veloura/index.php");
     exit();
 }

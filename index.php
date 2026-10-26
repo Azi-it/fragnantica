@@ -21,14 +21,23 @@ if (isset($_GET['search']) && trim($_GET['search']) !== '') {
 }
 $productCount = mysqli_num_rows($results);
 ?>
+<!-- banner: a looping candle video behind the title and the search box -->
+<div class="hero">
+    <video class="hero-video" autoplay muted loop playsinline>
+        <source src="includes/video/hero.mp4" type="video/mp4">
+    </video>
+    <div class="hero-content">
+        <h1>Veloura Fragrances</h1>
+        <p>Candles, diffusers and scents for every room</p>
+        <form action="index.php" method="GET" class="d-flex col-11 col-md-6 mx-auto">
+            <input class="form-control me-2" type="search" placeholder="Search by name, brand or category" name="search">
+            <button class="btn btn-light" type="submit">Search</button>
+        </form>
+    </div>
+</div>
+
 <div class="container mt-4">
     <?php include('./includes/alert.php'); ?>
-    <h1 align="center">Veloura Fragrances</h1>
-
-    <form action="index.php" method="GET" class="d-flex col-md-6 mx-auto my-4">
-        <input class="form-control me-2" type="search" placeholder="Search by name, brand or category" name="search">
-        <button class="btn btn-primary" type="submit">Search</button>
-    </form>
 
     <?php
     if ($keyword !== '') {
